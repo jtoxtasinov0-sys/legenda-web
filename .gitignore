@@ -1,0 +1,5 @@
+# Lokal ishchi skriptlar va eslatmalar (butun loyiha papkasiga bog`liq)
+_build.py
+kliplarni_joylash.py
+README.txt
+__pycache__/

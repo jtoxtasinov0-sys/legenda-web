@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="uz">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Legenda — erkaklar kiyimi</title>
+<meta name="description" content="Legenda: Andijon, Shahrixon va Asakadagi erkaklar kiyim do'konlari. Klassik va zamonaviy obrazlar.">
+<meta name="theme-color" content="#f5f0e8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav" id="nav">
+  <a class="brand" href="#top" aria-label="Legenda — bosh sahifa">
+    <svg viewBox="0 0 40 30" aria-hidden="true"><path d="M20 4a3.2 3.2 0 1 1 3.2 3.2c-1.2 0-3.2.8-3.2 2.6v1.6L37 24H3l17-12.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
+    <span>LEGENDA</span>
+  </a>
+  <nav>
+    <a href="#top">Filiallar</a>
+    <a href="#katalog" id="navCatalog" hidden>Katalog</a>
+    <a href="#aloqa">Aloqa</a>
+  </nav>
+</header>
+
+<!-- 1. INTRO: bulutlardan vodiyga, 3 ta do'kon tanlovi -->
+<section class="intro" id="top" aria-label="Filialni tanlang">
+  <div class="valley" id="valley">
+    <div class="map" id="introMap"></div>
+    <video id="introVideo" muted playsinline preload="auto" hidden></video>
+  </div>
+  <div class="sky" id="sky"></div>
+  <div class="clouds" id="clouds" aria-hidden="true"></div>
+  <div class="intro-title" id="introTitle">
+    <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
+    <h1>LEGENDA</h1>
+    <span class="script">3 shahar — bitta uslub</span>
+  </div>
+  <div class="choose" id="choose">
+    <span class="kicker">FARG'ONA VODIYSI</span>
+    <h2>Qaysi filialga <em>kiramiz?</em></h2>
+  </div>
+  <div class="pins" id="pins"></div>
+  <div class="pick" id="pick"></div>
+  <button class="skip" id="skip" type="button">O'tkazib yuborish</button>
+</section>
+
+<!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi -->
+<section class="journey" id="journey" hidden aria-label="Do'konga kirish">
+  <div class="stage" id="stage">
+    <div class="layers" id="layers"></div>
+    <div class="ov ov-day" id="ovDay"></div>
+    <div class="ov ov-night" id="ovNight"></div>
+    <div class="ov ov-glow" id="ovGlow"></div>
+    <div class="ov ov-warm" id="ovWarm"></div>
+    <div class="vignette"></div>
+    <div class="cap" id="cap"></div>
+    <div class="hint" id="hint"><span>Pastga suring</span><i></i></div>
+    <div class="steps" id="steps">
+      <div class="track"><b id="trackFill"></b></div>
+      <ol><li>Osmon</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li></ol>
+    </div>
+    <button class="back" id="back" type="button">← Filiallar</button>
+  </div>
+</section>
+
+<!-- 3. TANLANGAN DO'KON KATALOGI -->
+<section class="catalog" id="katalog" hidden>
+  <div class="cat-head">
+    <div>
+      <span class="kicker" id="catKicker"></span>
+      <h2 id="catTitle"></h2>
+    </div>
+    <div class="cat-meta" id="catMeta"></div>
+  </div>
+  <div class="chips" id="chips" role="tablist"></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<!-- 4. ALOQA: uchala filial -->
+<section class="contacts" id="aloqa">
+  <span class="kicker">ALOQA</span>
+  <h2>Uchta filial — <em>bitta Legenda</em></h2>
+  <div class="branches" id="branches"></div>
+  <p class="delivery">O'zbekiston bo'ylab yetkazib berish bor.</p>
+</section>
+
+<footer class="foot">
+  <span>© LEGENDA</span>
+  <span>Klassik &amp; zamonaviy obrazlar</span>
+</footer>
+
+<script src="assets/data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
