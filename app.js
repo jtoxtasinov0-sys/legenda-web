@@ -355,46 +355,84 @@
       capEl.appendChild(el);
       return el;
     });
-    J = { key, st, L, caps, videos: null, cur: -1, phases: [0, .24, .45, .72, 1] };
+    J = { key, st, L, caps, film: null, cur: -1, phases: [0, .24, .45, .72, 1] };
     journey.style.height = '';
     sizeJourneyMap();
 
-    // Higgsfield kliplari (A, B, C, ... ketma-ket, kamida A–D) bo'lsa — kadrlar o'rniga videolar
-    const all = await Promise.all([...'ABCDEFG'].map(x => tryVideo(`assets/video/${key}_${x}.mp4`)));
-    const m = all.includes(null) ? all.indexOf(null) : all.length;
-    if (J && J.key === key && m >= 4) {
-      Object.values(L).forEach(el => el && el.remove());
-      J.videos = all.slice(0, m).map(v => {
-        const el = layer(''); el.appendChild(v);
-        v.addEventListener('seeked', journeyScrub.run);
-        return el;
-      });
-      // yozuvlar: A–B shahar, C fasad, D kechqurun, E va keyingilari — ichkari
-      J.phases = m > 4 ? [0, 2 / m, 3 / m, 4 / m, 1] : [0, .25, .5, .75, 1];
-      journey.style.height = `${100 + 105 * m}vh`; // har klipga bir xil skroll
-      journeyScrub.target = journeyProgress(); journeyScrub.jump();
-      render();
+    // Higgsfield kliplari bo'lsa — kadrlar o'rniga kino. Tahrir (FILMS) bo'lmasa yoki uning fayllaridan biri
+    // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D).
+    // internetda birinchi kadr kelishi uzoqroq — 10 s kutamiz, keyin rasmli animatsiyaga o'tamiz
+    const load = x => x.c ? tryVideo(`assets/video/${key}_${x.c}.mp4`, 10000) : loadImg(`assets/video/${key}_${x.img}.jpg`);
+    let plan = FILMS[key], media = plan && await Promise.all(plan.map(load));
+    if (!media || media.includes(null)) {
+      plan = [...'ABCDEFG'].map(c => ({ c }));
+      media = await Promise.all(plan.map(load));
+      const m = media.includes(null) ? media.indexOf(null) : media.length;
+      plan = plan.slice(0, m); media = media.slice(0, m);
     }
+    if (!(J && J.key === key && plan.length >= 4)) return;
+    Object.values(L).forEach(el => el && el.remove());
+    let at = 0;
+    J.film = plan.map((x, k) => {
+      const v = x.c ? media[k] : null, el = layer('');
+      el.appendChild(media[k]);
+      const from = x.from || 0, to = v ? Math.min(x.to || v.duration, v.duration - 0.05) : 0;
+      const it = { c: x.c, el, v, from, to, w: v ? to - from : x.w, fade: x.fade || 0, at };
+      if (v) v.addEventListener('seeked', journeyScrub.run);
+      at += it.w;
+      return it;
+    });
+    J.total = at;
+    // yozuvlar: A–B shahar, C fasad, D kechqurun, E va keyingisi — ichkari
+    const atOf = c => { const it = J.film.find(x => x.c === c); return it && it.at / at; };
+    J.phases = atOf('E') ? [0, atOf('C'), atOf('D'), atOf('E'), 1] : [0, .25, .5, .75, 1];
+    sizeJourney();
+    journeyScrub.target = journeyProgress(); journeyScrub.jump();
+    render();
   }
 
-  // Do'kon kliplari intro kabi suriladi: t (0–1) — hamma kliplar bo'ylab bitta uzluksiz vaqt.
-  // Klip almashganda yangisi kerakli kadrga surilib bo'lgach ko'rsatiladi, qo'shnilari esa oldindan
+  // Kino tahriri: Higgsfield kliplarining xira yoki sifatsiz joylari kesiladi.
+  // c — klip harfi, from/to — ishlatiladigan qismi (soniya); img — video o'rniga tiniq rasm (sekin yaqinlashadi),
+  // w — u necha "soniya" turadi; fade — oldingi kadrdan shuncha soniyada silliq erib o'tish.
+  const FILMS = {
+    // B ning o'rtasi xira (uylar surtilib ketgan); E da eshikdan keyin olomon buziladi, F da zallar bir-biriga eriydi
+    andijon: [{ c: 'A' }, { c: 'B', from: 3.4, fade: 0.8 }, { c: 'C' }, { c: 'D' }, { c: 'E', to: 2.3 },
+      { img: 'ichkari2', w: 3, fade: 1.2 }],
+  };
+  const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+
+  // Kino intro kabi suriladi: t (0–1) — hamma bo'laklar bo'ylab bitta uzluksiz vaqt.
+  // Bo'lak almashganda yangisi kerakli kadrga surilib bo'lgach ko'rsatiladi, qo'shnilari esa oldindan
   // chegara kadrga qo'yiladi (A oxiri = B boshi) — chok ko'rinmaydi.
-  const clipAt = k => J && J.videos && J.videos[k] && J.videos[k].firstChild;
-  const showClip = i => J.videos.forEach((el, k) => (el.style.opacity = k === i ? 1 : 0));
   const journeyScrub = scrubber(
-    () => { const v = clipAt(Math.max(0, J ? J.cur : 0)); return !v || !v.duration || v.seeking; },
+    () => { const it = J && J.film && J.film[Math.max(0, J.cur)]; return !it || (it.v && (!it.v.duration || it.v.seeking)); },
     t => {
-      const n = J.videos.length, pos = t * n, i = Math.min(n - 1, Math.floor(pos)), v = clipAt(i);
-      const moved = seekTo(v, (pos - i) * (v.duration - 0.05));
+      const F = J.film, pos = t * J.total;
+      let i = 0;
+      while (i < F.length - 1 && pos >= F[i + 1].at) i++;
+      const it = F[i];
+      J.local = clamp((pos - it.at) / it.w);
+      const moved = !!it.v && seekTo(it.v, it.from + J.local * (it.to - it.from));
       if (i !== J.cur) {
-        J.cur = i;
-        if (moved) v.addEventListener('seeked', () => J.cur === i && showClip(i), { once: true });
-        else showClip(i);
-        [i - 1, i + 1].forEach(k => { const w = clipAt(k); if (w && w.duration) seekTo(w, k < i ? w.duration - 0.05 : 0); });
+        J.cur = i; J.ready = !moved;
+        if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
+        [i - 1, i + 1].forEach(k => { const n = F[k]; if (n && n.v && n.v.duration) seekTo(n.v, k < i ? n.to : n.from); });
       }
+      if (J.ready) paintFilm();
       return moved;
     });
+
+  // "fade" bo'lsa, bo'lak boshida oldingi kadr (oxirida to'xtagan) ostida biroz kattalashib eriydi.
+  // Rasmlar o'z vaqti davomida sekin yaqinlashadi.
+  function paintFilm() {
+    const F = J.film, i = J.cur, f = F[i].fade ? clamp(J.local * F[i].w / F[i].fade) : 1;
+    F.forEach((x, k) => {
+      const out = k === i - 1 && f < 1;
+      x.el.style.opacity = k === i ? f.toFixed(3) : out ? 1 : 0;
+      const push = x.v ? 1 : lerp(1, 1.08, k === i ? J.local : k < i ? 1 : 0);
+      x.el.style.transform = `scale(${(push * (out ? lerp(1, 1.06, f) : 1)).toFixed(4)})`;
+    });
+  }
 
   function sizeJourneyMap() {
     if (!J || !J.L.map) return;
@@ -403,8 +441,13 @@
     J.L.map.style.transformOrigin = `${x}px ${y}px`;
   }
 
+  // ~21vh skroll = kinoning 1 soniyasi. Kiyib ko'rish erib tushadigan bo'lsa, kino 100vh oldinroq tugaydi
+  // va oxirida yana 100vh qo'shiladi — shu oraliqda kino oxirgi kadrida turadi, ustiga kiyim xonasi eriydi.
+  function sizeJourney() {
+    if (J && J.film) journey.style.height = `${100 + 21 * J.total + (tryOverlap() ? 100 : 0)}vh`;
+  }
   function journeyProgress() {
-    const top = journey.offsetTop, len = journey.offsetHeight - innerHeight;
+    const top = journey.offsetTop, len = journey.offsetHeight - innerHeight * (J && J.film && tryOverlap() ? 2 : 1);
     return clamp((scrollY - top) / len);
   }
 
@@ -417,7 +460,7 @@
 
   function renderJourney(p) {
     const { L, st, phases: P, caps } = J;
-    if (J.videos) {
+    if (J.film) {
       journeyScrub.target = p; journeyScrub.run();
       [ovDay, ovNight, ovGlow, ovWarm].forEach(o => (o.style.opacity = 0));
     } else {
@@ -505,38 +548,103 @@
   }
 
   /* ---------- KIYIB KO'RISH ---------- */
-  // Mehmon bo'y va vaznini tanlaydi → shunday gavdali odam Higgsfield videolarida kiyimlarni kiyib ko'radi:
-  // "tanlash" videosi aylanada o'ynaydi, obraz tanlansa — "lookN" (odam aylanib, o'sha kiyimda to'xtaydi).
-  // Videosi hali yo'q gavda uchun o'sha odamning rasmlari ko'rsatiladi. Odam va kiyimlar — Andijon do'konidan.
+  // Andijon: kiyim ilgichda turadi (Legenda xonasi), o'ngda kartochka. "Modelda ko'rish" → bo'y/vazn (bir marta) →
+  // shunday gavdali model shu kiyimda sekin bir aylanadi. Videosi hali yo'q obraz modelning rasmi bilan ko'rsatiladi,
+  // rasmi yo'q gavda o'rniga — o'rta gavda. Bo'lim kino sahnasi ustiga erib tushadi (render() pastda).
   const TRY_STORE = 'andijon';
+  const LOOKS = ['LG-014', 'LG-018', 'LG-013'];
   const BODIES = {
-    ozgin: { name: "Ozg'in", h: 180, w: 65, looks: ['LG-014', 'LG-018', 'LG-013'] },
-    orta: { name: "O'rta", h: 178, w: 80, looks: ['LG-014', 'LG-018', 'LG-013'] },
-    yirik: { name: 'Yirik', h: 182, w: 110, looks: ['LG-014', 'LG-018', 'LG-012'] },
+    ozgin: { name: "Ozg'in", h: 180, w: 65 },
+    orta: { name: "O'rta", h: 178, w: 80 },
+    yirik: { name: 'Yirik', h: 182, w: 110 },
   };
   // tana massasi indeksi: namunalar ~20 (ozg'in), ~25 (o'rta), ~33 (yirik) — chegaralar ularning o'rtasida
   const bodyOf = (h, w) => { const bmi = w / (h / 100) ** 2; return bmi < 22.5 ? 'ozgin' : bmi < 29 ? 'orta' : 'yirik'; };
-  const lookProduct = (key, i) => PRODUCTS.find(p => p.id === BODIES[key].looks[i]);
+  const KI = n => `assets/kiyim/${n}.jpg`;
+  const known = {}; // rasm bormi — har biri bir marta tekshiriladi
+  const has = src => known[src] || (known[src] = loadImg(src).then(Boolean));
 
-  const tryEl = $('#kiyim'), tryForm = $('#tryForm'), tryLooks = $('#tryLooks'), looksEl = $('#looks'), lookInfo = $('#lookInfo');
-  const hIn = $('#hIn'), wIn = $('#wIn'), bodiesEl = $('#bodies'), navTry = $('#navTry');
-  const M = { fon: $('#tryFon'), s1: $('#tryS1'), s2: $('#tryS2'), loop: $('#tryLoop'), look: $('#tryLook') };
-  let TB = null; // tanlangan gavda: { key, video, look }
-  // telefonda panel videoning ostida — tugma bosilgach video ekranga qaytariladi
+  const tryEl = $('#kiyim'), tryStage = $('#tryStage'), navTry = $('#navTry'), tryCount = $('#tryCount');
+  const tryInfo = $('#tryInfo'), trySize = $('#trySize'), tryActions = $('#tryActions'), tryThumbs = $('#tryThumbs');
+  const hIn = $('#hIn'), wIn = $('#wIn'), bodiesEl = $('#bodies');
+  const imgA = $('#tryA'), imgB = $('#tryB'), tryV = $('#tryV');
+  // telefonda rasm tepada, kartochka ostida — erib o'tish yo'q, oddiy bo'lim
   const stacked = matchMedia('(max-width: 760px), (max-aspect-ratio: 4 / 5)');
-  const toVideo = () => stacked.matches && tryEl.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+  const tryOverlap = () => !tryEl.hidden && !stacked.matches;
+  // look — qaysi kiyim, mode — 'ilgich' | 'size' | 'model', body — tanlangan gavda, turn — aylanish videosi bormi
+  const T = { look: 0, mode: 'ilgich', body: null, turn: false, fallback: false, shown: '' };
 
-  const showMedia = el => Object.values(M).forEach(x => x.classList.toggle('on', x === el));
-  // rasmdan rasmga silliq o'tish: ikkita <img> navbat bilan
-  function showStill(src) {
-    const el = M.s1.classList.contains('on') ? M.s2 : M.s1, tok = TB;
+  // rasmdan rasmga silliq o'tish: ikkita <img> navbat bilan. Ko'rsatilgach true qaytaradi.
+  function showImg(src) {
+    T.shown = src;
+    const el = imgA.classList.contains('on') ? imgB : imgA;
     el.src = src;
-    el.decode().catch(() => {}).then(() => {
-      if (TB !== tok) return;
-      showMedia(el); M.loop.pause(); M.look.pause();
+    return el.decode().catch(() => {}).then(() => {
+      if (T.shown !== src) return false;
+      [imgA, imgB, tryV].forEach(x => x.classList.toggle('on', x === el));
+      tryV.pause();
+      return true;
     });
   }
+  function playTurn() {
+    tryV.currentTime = 0;
+    tryV.play().then(() => tryV.classList.add('on')).catch(() => {});
+  }
+  // model shu kiyimda: avval rasm (videoning birinchi kadri bilan bir xil), video bo'lsa — ustiga chiqib bir aylanadi
+  async function showModel() {
+    const id = LOOKS[T.look], ok = await has(KI(`${T.body}_${id}`));
+    if (T.mode !== 'model' || LOOKS[T.look] !== id) return;
+    const name = `${ok ? T.body : 'orta'}_${id}`;
+    T.fallback = !ok; renderCard();
+    const wasVideo = tryV.classList.contains('on');
+    if (!(await showImg(KI(name)))) return;
+    if (wasVideo) await new Promise(r => setTimeout(r, 750)); // eski video to'liq so'nsin — src almashganda qora chaqnamasin
+    const v = await tryVideo(`assets/video/${name}.mp4`, 4000, tryV);
+    if (!v || T.mode !== 'model' || LOOKS[T.look] !== id || T.shown !== KI(name)) return;
+    T.turn = true; renderCard();
+    playTurn();
+  }
 
+  function renderCard() {
+    const id = LOOKS[T.look], p = PRODUCTS.find(x => x.id === id), order = orderLink(STORES[TRY_STORE]);
+    tryCount.textContent = `0${T.look + 1} / 0${LOOKS.length}`;
+    const who = T.mode === 'model' ? `<div class="who">${esc(BODIES[T.body].name)} gavda · ${hIn.value} sm · ${wIn.value} kg
+      <button type="button" data-act="size">o’zgartirish</button>${T.fallback ? '<br>Bu gavdadagi model tez orada — hozircha o’rta gavdada' : ''}</div>` : '';
+    tryInfo.innerHTML = p ? `<span class="id">${p.id} · ${esc(CAT[p.kategoriya] || p.kategoriya)}</span><h3>${esc(p.nomi)}</h3>
+      <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>${partsHtml(p)}${sizesHtml(p)}${who}` : '';
+    trySize.hidden = T.mode !== 'size';
+    tryInfo.hidden = tryActions.hidden = T.mode === 'size';
+    tryActions.innerHTML = T.mode === 'model'
+      ? `${T.turn ? '<button class="btn" type="button" data-act="turn">↻ Yana aylantir</button>' : ''}
+        <button class="btn ghost" type="button" data-act="ilgich">← Ilgichga</button><a class="btn ghost" href="${order}">Buyurtma</a>`
+      : `<button class="btn" type="button" data-act="model">Modelda ko’rish</button><a class="btn ghost" href="${order}">Buyurtma berish</a>`;
+    tryThumbs.querySelectorAll('button').forEach((b, i) => b.classList.toggle('on', i === T.look));
+  }
+
+  function show() {
+    T.turn = false;
+    if (T.mode === 'model') showModel();
+    else if (T.mode === 'ilgich') showImg(KI('ilgich_' + LOOKS[T.look]));
+    renderCard();
+  }
+  const go = i => { T.look = (i + LOOKS.length) % LOOKS.length; show(); };
+  const setMode = m => {
+    T.mode = m; show();
+    if (stacked.matches && m !== 'size') tryEl.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+  };
+  function act(a) {
+    if (a === 'model') setMode(T.body ? 'model' : 'size');
+    else if (a === 'size' || a === 'ilgich') setMode(a);
+    else if (a === 'turn') playTurn();
+  }
+  tryActions.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) act(b.dataset.act); });
+  tryInfo.addEventListener('click', e => { const b = e.target.closest('[data-act]'); if (b) act(b.dataset.act); });
+  $('#tryPrev').addEventListener('click', () => go(T.look - 1));
+  $('#tryNext').addEventListener('click', () => go(T.look + 1));
+  tryThumbs.innerHTML = LOOKS.map((id, i) => `<button type="button" data-i="${i}" aria-label="${id}"><img src="${KI('ilgich_' + id)}" alt=""></button>`).join('');
+  tryThumbs.addEventListener('click', e => { const b = e.target.closest('button'); if (b) go(+b.dataset.i); });
+
+  // bo'y va vazn
   bodiesEl.innerHTML = Object.entries(BODIES).map(([k, b]) =>
     `<button type="button" data-b="${k}"><b>${esc(b.name)}</b><small>${b.h} sm · ${b.w} kg</small></button>`).join('');
   function syncForm() {
@@ -553,63 +661,16 @@
     hIn.value = BODIES[x.dataset.b].h; wIn.value = BODIES[x.dataset.b].w;
     syncForm();
   });
-  tryForm.addEventListener('submit', e => { e.preventDefault(); chooseBody(bodyOf(+hIn.value, +wIn.value)); toVideo(); });
-  $('#tryBack').addEventListener('click', () => resetTry());
-  looksEl.addEventListener('click', e => { const x = e.target.closest('button'); if (x && TB) { playLook(+x.dataset.i); toVideo(); } });
-  lookInfo.addEventListener('click', e => {
-    if (!e.target.closest('[data-replay]')) return;
-    M.look.currentTime = 0; M.look.play().catch(() => {});
-    toVideo();
-  });
+  trySize.addEventListener('submit', e => { e.preventDefault(); T.body = bodyOf(+hIn.value, +wIn.value); setMode('model'); });
+  $('#sizeCancel').addEventListener('click', () => setMode('ilgich'));
 
   function resetTry() {
-    TB = null;
-    tryForm.hidden = false; tryLooks.hidden = true;
-    M.loop.pause(); M.look.pause();
-    showMedia(M.fon);
+    Object.assign(T, { look: 0, mode: 'ilgich', turn: false, fallback: false });
     syncForm();
+    show();
   }
-
-  async function chooseBody(key) {
-    const b = BODIES[key], tok = TB = { key, video: false, look: -1 };
-    tryForm.hidden = true; tryLooks.hidden = false; lookInfo.hidden = true;
-    $('#tryWho').textContent = ap(`${b.name} gavda · ${hIn.value} sm · ${wIn.value} kg`);
-    looksEl.innerHTML = b.looks.map((id, i) => {
-      const p = lookProduct(key, i);
-      return p ? `<button type="button" data-i="${i}"><img src="${p.img}" alt=""><span class="n">${esc(p.nomi)}</span><span class="pr">${som(p.narx)} so’m</span></button>` : '';
-    }).join('');
-    // video yuklanguncha (va har obraz boshida) odamning o'zi ko'rinadi
-    const model = `assets/kiyim/${key}_model.jpg`;
-    M.loop.poster = M.look.poster = model;
-    tok.video = !!(await tryVideo(`assets/video/${key}_tanlash.mp4`, 4000, M.loop));
-    if (TB !== tok || tok.look >= 0) return;
-    if (tok.video) { M.loop.play().catch(() => {}); showMedia(M.loop); }
-    else showStill(model);
-  }
-
-  function playLook(i) {
-    const tok = TB, { key, video } = tok, p = lookProduct(key, i);
-    tok.look = i;
-    looksEl.querySelectorAll('button').forEach(x => x.classList.toggle('on', +x.dataset.i === i));
-    lookInfo.innerHTML = `<span class="id">${p.id} · ${esc(CAT[p.kategoriya] || p.kategoriya)}</span><h3>${esc(p.nomi)}</h3>
-      <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>${partsHtml(p)}${sizesHtml(p)}
-      <div class="row"><a class="btn light" href="${orderLink(STORES[TRY_STORE])}">Buyurtma berish</a>${video ? '<button class="btn line" type="button" data-replay>↻ Qayta ko’rish</button>' : ''}</div>`;
-    lookInfo.hidden = false;
-    const still = `assets/kiyim/${key}_look${i + 1}.jpg`;
-    if (!video) return showStill(still);
-    const v = M.look;
-    v.src = `assets/video/${key}_look${i + 1}.mp4`;
-    v.play()
-      .then(() => { if (TB === tok && tok.look === i) { showMedia(v); setTimeout(() => M.loop.pause(), 700); } })
-      .catch(() => { if (TB === tok && tok.look === i) showStill(still); });
-  }
-
-  // ekrandan chiqsa videolar to'xtaydi (skroll kinosiga kuch qoladi), qaytsa — davom etadi
-  new IntersectionObserver(([e]) => {
-    const v = [M.loop, M.look].find(x => x.classList.contains('on'));
-    if (!e.isIntersecting) { M.loop.pause(); M.look.pause(); }
-    else if (v && !v.ended) v.play().catch(() => {});
-  }).observe(tryEl);
+  // ekrandan chiqsa video to'xtaydi
+  new IntersectionObserver(([e]) => { if (!e.isIntersecting) tryV.pause(); }).observe(tryStage);
 
   /* ---------- ALOQA ---------- */
 
@@ -635,7 +696,7 @@
     renderCatalog(key);
     journey.hidden = false; catalog.hidden = false; navCatalog.hidden = false;
     tryEl.hidden = navTry.hidden = key !== TRY_STORE;
-    if (!tryEl.hidden) { M.fon.src = `assets/kiyim/fon_${key}.jpg`; resetTry(); }
+    if (!tryEl.hidden) resetTry();
     history.replaceState(null, '', '#' + key);
     requestAnimationFrame(() => {
       sizeJourneyMap(); render();
@@ -652,13 +713,18 @@
     renderIntro();
     const inJourney = J && !journey.hidden && y >= journey.offsetTop - innerHeight && y <= journey.offsetTop + journey.offsetHeight;
     if (inJourney) renderJourney(journeyProgress());
-    const overJourney = J && !journey.hidden && y >= journey.offsetTop - 60 && y < journey.offsetTop + journey.offsetHeight - 60;
-    const overTry = !tryEl.hidden && y >= tryEl.offsetTop - 60 && y < tryEl.offsetTop + tryEl.offsetHeight - 60;
-    nav.classList.toggle('dark', !!overJourney || overTry);
-    nav.classList.toggle('solid', !overJourney && !overTry && y > introEndY() + innerHeight * 0.6);
+    // kiyib ko'rish sahnasi kino ustiga erib tushadi: kino oxirida u ham, kino ham joyida turadi, faqat shaffofligi o'zgaradi
+    const fade = tryOverlap() ? clamp((y - tryEl.offsetTop) / innerHeight) : 1;
+    tryStage.style.opacity = tryOverlap() ? fade.toFixed(3) : '';
+    tryStage.classList.toggle('live', fade > 0.95);
+    // kino ustida menyu qora, yorug' kiyim xonasi ustida — oddiy
+    const tryFrom = tryEl.hidden ? Infinity : tryEl.offsetTop + (tryOverlap() ? innerHeight / 2 : -60);
+    const overJourney = J && !journey.hidden && y >= journey.offsetTop - 60 && y < Math.min(journey.offsetTop + journey.offsetHeight - 60, tryFrom);
+    nav.classList.toggle('dark', !!overJourney);
+    nav.classList.toggle('solid', !overJourney && y > introEndY() + innerHeight * 0.6);
   }
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
-  addEventListener('resize', () => { placePins(); sizeJourneyMap(); render(); });
+  addEventListener('resize', () => { placePins(); sizeJourneyMap(); sizeJourney(); render(); });
 
   // Ishga tushirish
   (async () => {

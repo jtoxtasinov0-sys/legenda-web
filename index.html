@@ -71,33 +71,34 @@
   </div>
 </section>
 
-<!-- 3. KIYIB KO'RISH: bo'y va vazn → shunday gavdali odam kiyimlarni kiyib ko'rsatadi (hozircha Andijon) -->
+<!-- 3. KIYIB KO'RISH (Andijon): kiyim ilgichda → "Modelda ko'rish" — mos gavdali model shu kiyimda sekin aylanadi.
+     Kino sahnasi ustiga erib tushadi (slayd emas). -->
 <section class="tryon" id="kiyim" hidden aria-label="Kiyib ko'rish">
-  <div class="try-stage">
+  <div class="try-stage" id="tryStage">
     <div class="try-media" id="tryMedia">
-      <img id="tryFon" class="on" alt="">
-      <img id="tryS1" alt="">
-      <img id="tryS2" alt="">
-      <video id="tryLoop" muted playsinline loop preload="auto"></video>
-      <video id="tryLook" muted playsinline preload="auto"></video>
+      <img id="tryA" alt="">
+      <img id="tryB" alt="">
+      <video id="tryV" muted playsinline preload="auto"></video>
     </div>
-    <form class="try-panel" id="tryForm">
-      <span class="kicker">KIYIB KO'RISH</span>
-      <h2>Bo'yingiz va <em>vazningiz?</em></h2>
-      <p class="lead">Sizga o'xshash gavdali odam kiyimlarimizni kiyib ko'rsatadi.</p>
-      <label class="slider"><span>Bo'y</span><output id="hOut"></output>
-        <input type="range" id="hIn" min="150" max="205" step="1" value="178"></label>
-      <label class="slider"><span>Vazn</span><output id="wOut"></output>
-        <input type="range" id="wIn" min="45" max="150" step="1" value="80"></label>
-      <div class="bodies" id="bodies" aria-label="Gavda"></div>
-      <button class="btn light" type="submit">Kiyib ko'rsat →</button>
-    </form>
-    <div class="try-panel" id="tryLooks" hidden>
-      <div class="try-top"><span class="kicker" id="tryWho"></span><button class="linkish" id="tryBack" type="button">O'zgartirish</button></div>
-      <h2>Qaysi obrazni <em>kiyamiz?</em></h2>
-      <div class="looks" id="looks"></div>
-      <div class="look-info" id="lookInfo" hidden></div>
-    </div>
+    <aside class="try-card">
+      <div class="try-top"><span class="kicker">LEGENDA XONASI</span><span class="try-count" id="tryCount"></span></div>
+      <div class="try-info" id="tryInfo"></div>
+      <form class="try-size" id="trySize" hidden>
+        <p>Bo'y va vazningizni tanlang — shunday gavdali model kiyib ko'rsatadi.</p>
+        <label class="slider"><span>Bo'y</span><output id="hOut"></output>
+          <input type="range" id="hIn" min="150" max="205" step="1" value="178"></label>
+        <label class="slider"><span>Vazn</span><output id="wOut"></output>
+          <input type="range" id="wIn" min="45" max="150" step="1" value="80"></label>
+        <div class="bodies" id="bodies" aria-label="Gavda"></div>
+        <div class="row"><button class="btn" type="submit">Ko'rsatish →</button><button class="btn ghost" type="button" id="sizeCancel">Bekor</button></div>
+      </form>
+      <div class="row try-actions" id="tryActions"></div>
+      <div class="try-nav">
+        <button type="button" class="arrow" id="tryPrev" aria-label="Oldingi kiyim">←</button>
+        <div class="thumbs" id="tryThumbs"></div>
+        <button type="button" class="arrow" id="tryNext" aria-label="Keyingi kiyim">→</button>
+      </div>
+    </aside>
   </div>
 </section>
 
