@@ -133,8 +133,12 @@
     // Higgsfield kliplari bo'lsa — kadrlar o'rniga kino. Tahrir (FILMS) bo'lmasa yoki uning fayllaridan biri
     // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D). Avval faqat videolarning boshi (metadata,
     // bir necha KB) olinadi — kino darhol tayyor; to'liq fayllar keyin navbat bilan yuklanadi (preloadFilm).
+    // Telefonda klipning kadrlari (WebP) bo'lsa — video o'rniga ular (frameSeq), bo'lmasa video.
     const url = x => x.c ? `assets/video/${key}_${x.c}${M}.mp4` : x.vid ? `assets/${x.vid}${M}.mp4` : `assets/${x.img}.jpg`;
-    const load = x => x.c || x.vid ? videoMeta(url(x)) : loadImg(url(x));
+    const kadr = await KADR, clipName = x => x.c ? `${key}_${x.c}` : x.vid.split('/').pop();
+    const load = x => x.c || x.vid
+      ? (kadr[clipName(x)] ? frameSeq(clipName(x), kadr[clipName(x)]) : Promise.resolve(null)).then(q => q || videoMeta(url(x)))
+      : loadImg(url(x));
     let plan = FILMS[key], media = plan && await Promise.all(plan.map(load));
     if (!media || media.includes(null)) {
       plan = [...'ABCDEFG'].map(c => ({ c }));
@@ -150,13 +154,14 @@
     stage.classList.add('film');
     let at = 0;
     J.film = plan.map((x, k) => {
-      const v = x.c || x.vid ? media[k] : null, el = layer('');
-      el.appendChild(media[k]);
+      // v — video, q — telefon kadrlari (canvas); ikkalasi ham "klip": uzunligi bor, skroll bilan suriladi
+      const m = media[k], q = m && m.canvas ? m : null, v = m instanceof HTMLVideoElement ? m : null, el = layer('');
+      el.appendChild(q ? q.canvas : m);
       if (x.look != null) el.classList.add('try');
       // aylanish videosi ustida uning Start = End kadri (2K rasm): model yuzi bilan turganda tiniq rasm ko'rinadi
       const still = x.still ? el.appendChild(Object.assign(new Image(), { className: 'still', alt: '', src: `assets/${x.still}${M}.jpg` })) : null;
-      const to = v ? v.duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
-      const it = { c: x.c, look: x.look, el, v, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
+      const to = v || q ? (v || q).duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
+      const it = { c: x.c, look: x.look, el, v, q, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
       if (v) v.addEventListener('seeked', journeyScrub.run);
       at += it.w;
       return it;
@@ -213,12 +218,60 @@
     v.onerror = () => { clearTimeout(tm); res(null); };
     v.src = src;
   });
+
+  // Telefonda kino videosi o'rniga kadrlar: har klipning har kadri alohida WebP (assets/kadr/{klip}/001.webp ...),
+  // canvas'ga chiziladi. iPhone (Safari, Telegram ichidagi brauzer) va quvvat tejash rejimida video skroll bilan
+  // surilmaydi yoki umuman yuklanmaydi — rasm esa hamma joyda bir xil ishlaydi. Ro'yxat: kadrlar.json (skript).
+  const KADR = PHONE ? fetch('assets/kadr/kadrlar.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
+  const frameUrl = (name, k) => `assets/kadr/${name}/${String(k + 1).padStart(3, '0')}.webp`;
+  // birinchi va oxirgi kadr darhol (bo'laklar chegarasi shular), qolganlari keyin navbat bilan (loadFrames)
+  async function frameSeq(name, m) {
+    const ends = await Promise.all([0, m.n - 1].map(k => loadImg(frameUrl(name, k))));
+    if (ends.includes(null)) return null;
+    const canvas = Object.assign(document.createElement('canvas'), { width: m.w, height: m.h });
+    const q = { name, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps, img: [], shown: -1, want: 0 };
+    q.img[0] = ends[0]; q.img[m.n - 1] = ends[1];
+    drawFrame(q, 0);
+    return q;
+  }
+  // t (soniya) dagi kadr; u hali yuklanmagan bo'lsa — eng yaqin yuklangani
+  function drawFrame(q, t) {
+    const want = clamp(Math.round(t * q.fps), 0, q.n - 1);
+    let k = -1;
+    for (let d = 0; k < 0 && d < q.n; d++) k = q.img[want - d] ? want - d : q.img[want + d] ? want + d : -1;
+    q.want = want;
+    if (k >= 0 && k !== q.shown) { q.ctx.drawImage(q.img[k], 0, 0, q.canvas.width, q.canvas.height); q.shown = k; }
+  }
+  // Kadrlar yuklanishi: avval butun kino bo'ylab har 8-kadr (kino darhol oxirigacha suriladi), keyin joriy
+  // bo'lakdan oldinga qarab qolganlari (har 4-, har 2-, hammasi) — skroll qilinayotgan joy birinchi silliqlashadi.
+  function loadFrames(j) {
+    const seqs = j.film.filter(it => it.q), lvl = k => (k % 8 ? k % 4 ? k % 2 ? 3 : 2 : 1 : 0);
+    seqs.forEach(it => { it.todo = [...Array(it.q.n).keys()].filter(k => !it.q.img[k]).sort((a, b) => lvl(a) - lvl(b) || a - b); });
+    const rank = it => { const f = j.film.indexOf(it), c = Math.max(0, j.cur); return f >= c ? f - c : 100 + c - f; };
+    const pick = () => {
+      const order = seqs.filter(it => it.todo.length).sort((a, b) => rank(a) - rank(b));
+      const it = order.find(x => lvl(x.todo[0]) === 0) || order[0];
+      return it && [it, it.todo.shift()];
+    };
+    const worker = async () => {
+      for (let p; J === j && (p = pick());) {
+        const [it, k] = p, im = await loadImg(frameUrl(it.q.name, k));
+        if (J !== j) return;
+        if (!im) continue;
+        it.q.img[k] = im;
+        // kerakli kadrga ko'rinib turganidan yaqinroq kadr keldi — qayta chizilsin
+        if (j.film[j.cur] === it && Math.abs(k - it.q.want) < Math.abs(it.q.shown - it.q.want)) journeyScrub.run();
+      }
+    };
+    for (let w = 0; w < 6; w++) worker();
+  }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const once = (el, ev) => new Promise(r => el.addEventListener(ev, r, { once: true }));
   // Kino videolari tartib bilan to'liq yuklanib, xotiraga olinadi (blob) — keyin skroll bilan surish tarmoqni
   // kutmaydi va qotmaydi. Yangi video eskisi turgan kadrga surilib, uning ostiga qo'yiladi; kadr chizilgach eskisi
   // olib tashlanadi — ko'rinib turgan video ham sezilmay almashadi.
   async function preloadFilm(j) {
+    if (j.film.some(it => it.q)) loadFrames(j);
     for (const it of j.film) {
       if (!it.v) continue;
       let blob = null;
@@ -255,11 +308,17 @@
       while (i < F.length - 1 && pos >= F[i + 1].at) i++;
       const it = F[i];
       J.local = clamp((pos - it.at) / it.w);
+      // kadrlar (telefon) darhol chiziladi — "seeked" kutilmaydi
+      if (it.q) drawFrame(it.q, clipTime(it, J.local));
       const moved = !!it.v && seekTo(it.v, clipTime(it, J.local));
       if (i !== J.cur) {
         J.cur = i; J.ready = !moved;
         if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
-        [i - 1, i + 1].forEach(k => { const n = F[k]; if (n && n.v && n.v.duration) seekTo(n.v, k < i ? n.to : n.from); });
+        [i - 1, i + 1].forEach(k => {
+          const n = F[k], t = n && (k < i ? n.to : n.from);
+          if (n && n.q) drawFrame(n.q, t);
+          else if (n && n.v && n.v.duration) seekTo(n.v, t);
+        });
       }
       if (J.ready) paintFilm();
       return moved;
@@ -275,7 +334,7 @@
       const out = k === i - 1 && f < 1, o = k === i ? f : k === i - 1 ? 1 : 0;
       x.el.style.opacity = o.toFixed(3);
       x.el.style.visibility = k >= i - 1 && k <= i + 1 ? 'visible' : 'hidden';
-      const push = x.v ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
+      const push = x.v || x.q ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
       x.el.style.transform = `scale(${(push * (out ? lerp(1, 1.06, f) : 1)).toFixed(4)})`;
       // tiniq rasm faqat model deyarli qimirlamaganda (birinchi ~0.2 s va oxirgi ~0.25 s) — keyin video
       if (x.still) {
