@@ -156,17 +156,22 @@
     let at = 0;
     J.film = plan.map((x, k) => {
       // v — video, q — telefon kadrlari (canvas); ikkalasi ham "klip": uzunligi bor, skroll bilan suriladi
-      const m = media[k], q = m && m.canvas ? m : null, v = m instanceof HTMLVideoElement ? m : null, el = layer('');
-      el.appendChild(q ? q.canvas : m);
+      const m = media[k], q = m && m.canvas ? m : null, v = m instanceof HTMLVideoElement ? m : null;
+      // .layer (tashqi) — parda o'tishida siljiydi va chetini kesadi; .in — rasm/video/kadrlar (yaqinlashish);
+      // .shade — ustiga yangi kadr chiqayotganda biroz qorayadi
+      const el = layer('<div class="in"></div><div class="shade"></div>'), inner = el.firstChild, shade = el.lastChild;
+      inner.appendChild(q ? q.canvas : m);
       if (x.look != null) el.classList.add('try');
       // aylanish videosi ustida uning Start = End kadri (2K rasm): model yuzi bilan turganda tiniq rasm ko'rinadi
-      const still = x.still ? el.appendChild(Object.assign(new Image(), { className: 'still', alt: '', src: `assets/${x.still}${M}.jpg` })) : null;
+      const still = x.still ? inner.appendChild(Object.assign(new Image(), { className: 'still', alt: '', src: `assets/${x.still}${M}.jpg` })) : null;
       const to = v || q ? (v || q).duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
-      const it = { c: x.c, look: x.look, el, v, q, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
+      const it = { c: x.c, look: x.look, el, inner, shade, v, q, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0,
+        wipe: !!x.wipe, dip: !!x.dip, push: x.push ?? 0.08, at };
       if (v) v.addEventListener('seeked', journeyScrub.run);
       at += it.w;
       return it;
     });
+    J.film.forEach((it, k) => { const n = J.film[k + 1]; if (n && n.dip) it.shade.classList.add('light'); });
     J.total = at;
     // yozuvlar: A–B shahar, C fasad, D kechqurun, E — kirish; keyin kiyimlar (kartochka)
     const atOf = c => { const it = J.film.find(x => x.c === c); return it && it.at / at; };
@@ -185,18 +190,24 @@
   // berilmasa — uzunligi); fade — oldingi kadrdan shuncha soniyada erib o'tish; push — rasm sekin yaqinlashishi;
   // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi;
   // keys — [skroll ulushi, video soniyasi] nuqtalari: xira joy skrollda tez o'tib ketadi, tiniq joy uzoqroq turadi.
-  // model videosi: ilgichdan erib o'tayotganda (fade 1 / w 8) yuzi bilan turadi, keyin skroll bilan bir aylanadi
+  // wipe — o'tish "parda" bilan (paintFilm): yangi kadr pastdan chiqib eskisini yopadi, eskisi sekinroq yuqoriga
+  // siljib qorayadi (ustma-ust erish — "arvoh" — yo'q). Kiyimlar orasida shu.
+  // dip — eshikdan kirish: kamera eshikka yaqinlashib iliq yorug'likka "sho'ng'iydi", xona yorug'likdan ochiladi.
+  // model videosi: parda chiqayotganda (fade 1.5 / w 8.5) yuzi bilan turadi, keyin skroll bilan bir aylanadi
   // va oxirida yana biroz yuzi bilan turadi. Turgan paytda video ustida tiniq rasm (still) — Higgsfield videosi
   // aylanish paytida xiraroq, rasm esa 2K.
-  const TURN = [[0, 0], [0.125, 0], [0.94, 5], [1, 5]];
+  const TURN = [[0, 0], [0.18, 0], [0.94, 5], [1, 5]];
   const FILMS = {
     // do'kon tepasidagi dron kadridan (B, 1 s — sekinroq suriladi) boshlanadi; eshikdan kirgach — kiyimlar:
     // har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
     // C da 2.2–3.5 s — kamera tomlar ustidan o'tadi, chetlarda xira narsalar: skrollning 8% ida o'tadi
     andijon: [{ c: 'B', w: 2.5 }, { c: 'C', keys: [[0, 0], [0.42, 2.2], [0.5, 3.5], [1, 5]] }, { c: 'D' }, { c: 'E' },
-      { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', still: 'kiyim/orta_LG-014', w: 8, fade: 1, keys: TURN, look: 0 },
-      { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', still: 'kiyim/orta_LG-018', w: 8, fade: 1, keys: TURN, look: 1 },
-      { img: 'kiyim/ilgich_LG-013', w: 1.8, fade: 1, push: 0.03, look: 2 }, { img: 'kiyim/orta_LG-013', w: 3, fade: 1, push: 0.03, look: 2 }],
+      { img: 'kiyim/ilgich_LG-014', w: 2.2, fade: 1.6, dip: true, push: 0.03, look: 0 },
+      { vid: 'video/orta_LG-014', still: 'kiyim/orta_LG-014', w: 8.5, fade: 1.5, wipe: true, keys: TURN, look: 0 },
+      { img: 'kiyim/ilgich_LG-018', w: 2.3, fade: 1.5, wipe: true, push: 0.03, look: 1 },
+      { vid: 'video/orta_LG-018', still: 'kiyim/orta_LG-018', w: 8.5, fade: 1.5, wipe: true, keys: TURN, look: 1 },
+      { img: 'kiyim/ilgich_LG-013', w: 2.3, fade: 1.5, wipe: true, push: 0.03, look: 2 },
+      { img: 'kiyim/orta_LG-013', w: 3.5, fade: 1.5, wipe: true, push: 0.03, look: 2 }],
   };
   const LOOKS = ['LG-014', 'LG-018', 'LG-013'];
   // keys bo'yicha: skroll ulushi t → video soniyasi
@@ -361,7 +372,7 @@
       j.blobs.push(u);
       if (J !== j) return;
       if (!v) continue;
-      it.el.insertBefore(v, old);
+      old.parentNode.insertBefore(v, old);
       v.currentTime = old.currentTime;
       await once(v, 'seeked');
       // kadr ekranga chiqquncha (yashirin varaqda requestVideoFrameCallback kelmasligi mumkin — 300 ms dan keyin baribir)
@@ -407,14 +418,32 @@
   // Rasmlar o'z vaqti davomida sekin yaqinlashadi. Oldingi bo'lak har doim joriysining ostida ko'rinib turadi —
   // yangi video kadri hali chizilmagan bo'lsa ham ekran qoraymaydi va pirpiramaydi. Keyingisi shaffof, lekin
   // chiziladi (kadri tayyor turadi); qolganlari umuman chizilmaydi (visibility) — tezroq.
+  //
+  // "dip": eski kadr (eshik) kattalashib iliq-oq rangga botadi (.shade.light), yangisi shu rangdan ochilib
+  // 1.07 dan 1 ga o'tiradi — ikki kadr hech qachon ustma-ust ko'rinmaydi.
+  // "wipe" (parda) o'tishi — faqat transform va shaffoflik (kompozitor, telefonda ham silliq):
+  // yangi qatlam (tashqi) pastdan yuqoriga siljiydi, ichi esa teskari siljib joyida turadi — chegara chizig'i
+  // ekran bo'ylab pastdan yuqoriga yuradi; yangi kadr 1.08 dan 1 ga "o'tiradi". Eski kadr sekinroq (18%) yuqoriga
+  // ketadi va qorayadi — chuqurlik. Chegarada yumshoq soya va yupqa oltin chiziq (CSS .layer.wipe).
   function paintFilm() {
     const F = J.film, i = J.cur, f = F[i].fade ? clamp(J.local * F[i].w / F[i].fade) : 1;
+    const wipe = F[i].wipe && f < 1, dip = F[i].dip && f < 1, e = ease(f);
     F.forEach((x, k) => {
-      const out = k === i - 1 && f < 1, o = k === i ? f : k === i - 1 ? 1 : 0;
+      const out = k === i - 1 && f < 1;
+      const o = k === i ? (wipe ? 1 : dip ? ramp(f, 0.42, 0.95) : f) : k === i - 1 ? 1 : 0;
       x.el.style.opacity = o.toFixed(3);
       x.el.style.visibility = k >= i - 1 && k <= i + 1 ? 'visible' : 'hidden';
       const push = x.v || x.q ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
-      x.el.style.transform = `scale(${(push * (out ? lerp(1, 1.06, f) : 1)).toFixed(4)})`;
+      let y = 0, iy = 0, sc = push, dark = 0;
+      if (k === i && wipe) { y = (1 - e) * 100; iy = -y; sc *= lerp(1.08, 1, e); }
+      else if (out && wipe) { iy = -18 * e; dark = 0.42 * e; }
+      else if (k === i && dip) sc *= lerp(1.07, 1, ease(ramp(f, 0.42, 1)));
+      else if (out && dip) { sc *= lerp(1, 1.16, ease(ramp(f, 0, 0.6))); dark = ease(ramp(f, 0.12, 0.55)); }
+      else if (out) sc *= lerp(1, 1.06, f); // erib o'tish: eski kadr biroz kattalashib so'nadi
+      x.el.style.transform = y ? `translate3d(0, ${y.toFixed(3)}%, 0)` : 'none';
+      x.inner.style.transform = `translate3d(0, ${iy.toFixed(3)}%, 0) scale(${sc.toFixed(4)})`;
+      x.shade.style.opacity = dark.toFixed(3);
+      if (x.el.classList.contains('wipe') !== (k === i && wipe)) x.el.classList.toggle('wipe');
       // tiniq rasm faqat model deyarli qimirlamaganda (birinchi ~0.2 s va oxirgi ~0.25 s) — keyin video
       if (x.still) {
         const t = k === i ? clipTime(x, J.local) : k < i ? x.to : x.from;

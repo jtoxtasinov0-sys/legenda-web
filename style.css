@@ -44,6 +44,13 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #0d0b0a; }
 .layers, .layer { position: absolute; inset: 0; }
 .layer { will-change: transform, opacity; opacity: 0; }
+/* kino qatlami: .in — rasm/video/kadrlar, .shade — qorayish (parda o'tishida eski kadr ustida) */
+.layer .in { position: absolute; inset: 0; will-change: transform; }
+.layer .shade { position: absolute; inset: 0; background: #120c06; opacity: 0; pointer-events: none; }
+.layer .shade.light { background: #f1e8da; } /* eshikdan kirishda — iliq yorug'lik */
+/* parda o'tishi: yangi kadr pastdan chiqadi — chegarasi kesilgan, ustida yumshoq soya va yupqa oltin chiziq */
+.layer.wipe { overflow: hidden; box-shadow: 0 -28px 70px rgba(18, 12, 6, .38); }
+.layer.wipe::before { content: ''; position: absolute; z-index: 2; inset: 0 0 auto; height: 1px; background: linear-gradient(90deg, rgba(241, 216, 179, 0), rgba(241, 216, 179, .85) 22%, rgba(241, 216, 179, .85) 78%, rgba(241, 216, 179, 0)); }
 .layer img, .layer video, .layer canvas, .layer svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ov { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
 /* kinoda bu qoplamalar ishlatilmaydi — aralashtirish (blend) qatlamlari umuman chizilmasin */
