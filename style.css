@@ -9,7 +9,6 @@
   --line: #ddd0bd;
   --card: #fffcf7;
   --serif: 'DM Serif Display', Georgia, serif;
-  --thin: 'Cormorant Garamond', Georgia, serif;
   --script: 'Kaushan Script', cursive;
   --sans: 'Manrope', system-ui, sans-serif;
   --gutter: clamp(16px, 5vw, 72px);
@@ -98,8 +97,10 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #0d0b0a; }
 .layers, .layer { position: absolute; inset: 0; }
 .layer { will-change: transform, opacity, filter; opacity: 0; }
-.layer img, .layer video, .layer svg { width: 100%; height: 100%; object-fit: cover; }
+.layer img, .layer video, .layer svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ov { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
+/* kinoda bu qoplamalar ishlatilmaydi — aralashtirish (blend) qatlamlari umuman chizilmasin */
+.stage.film .ov { display: none; }
 .ov-day { background: linear-gradient(180deg, rgba(196, 223, 255, .75), rgba(255, 250, 240, .25)); mix-blend-mode: screen; }
 .ov-night { background: linear-gradient(180deg, rgba(10, 20, 60, .96) 0%, rgba(22, 32, 78, .7) 45%, rgba(12, 12, 34, .45) 100%); mix-blend-mode: multiply; }
 .ov-glow { background: radial-gradient(ellipse 34% 30% at var(--gx, 50%) var(--gy, 60%), rgba(255, 200, 120, .85), rgba(255, 170, 80, .3) 45%, transparent 72%); mix-blend-mode: screen; }
@@ -121,62 +122,38 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .steps { position: absolute; z-index: 5; left: var(--gutter); right: var(--gutter); bottom: clamp(24px, 5vh, 44px); color: #fff; }
 .track { height: 2px; background: rgba(255, 255, 255, .25); border-radius: 2px; overflow: hidden; }
 .track b { display: block; height: 100%; width: 0; background: var(--accent-soft); }
-.steps ol { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); font: 600 11px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; }
+.steps ol { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; font: 600 11px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; }
 .steps li { opacity: .45; transition: opacity .3s; }
 .steps li.on { opacity: 1; }
 .steps li:not(:first-child) { text-align: center; }
-.steps li:last-child { text-align: right; }
+.steps li:last-child, .steps li:nth-child(4):has(+ li[hidden]) { text-align: right; }
 .back { position: absolute; z-index: 6; left: var(--gutter); top: 84px; padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(0, 0, 0, .28); color: #fff; font: 600 12px/1 var(--sans); letter-spacing: .1em; cursor: pointer; backdrop-filter: blur(8px); }
 .back:hover { background: rgba(0, 0, 0, .45); }
 
-/* ---------- KIYIB KO'RISH ---------- */
-/* Kino sahnasi ustiga erib tushadi: bo'lim kinoning oxirgi 200vh siga kiradi, sahnasi sticky, shaffofligini JS boshqaradi */
-.tryon { position: relative; z-index: 3; margin-top: -200vh; height: 300vh; pointer-events: none; }
-.tryon[hidden] { display: none; }
-.try-stage { position: sticky; top: 0; height: 100vh; height: 100svh; min-height: 600px; overflow: hidden; background: #e9e1d4; opacity: 0; }
-.try-stage.live { pointer-events: auto; }
-.try-media { position: absolute; inset: 0; }
-/* kiyim (va model) kadrning chap-o'rtasida, o'ng tomonda kartochka */
-.try-media > * { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 40% 50%; opacity: 0; transition: opacity .7s ease; }
-.try-media > .on { opacity: 1; }
-.try-card { position: absolute; z-index: 2; right: var(--gutter); top: 50%; translate: 0 -50%; width: min(380px, 32vw); max-height: calc(100% - 130px); margin-top: 28px; overflow-y: auto; scrollbar-width: none; display: grid; gap: 16px; padding: 24px 22px 18px; border-radius: 26px; background: rgba(255, 252, 247, .86); border: 1px solid rgba(255, 255, 255, .7); box-shadow: 0 30px 80px rgba(70, 45, 20, .18); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); }
-.try-card::-webkit-scrollbar { display: none; }
+/* ---------- KIYIMLAR (kino ichida) ---------- */
+/* kiyim va model kadrning chap-o'rtasida — tor ekranda ham ko'rinib tursin */
+.layer.try img, .layer.try video { object-position: 37% 50%; }
+.vignette { transition: opacity .6s; }
+.stage.light .vignette { opacity: 0; }
+.stage.light .steps { color: var(--ink); }
+.stage.light .track { background: rgba(24, 20, 17, .15); }
+.stage.light .track b { background: var(--accent); }
+.stage.light .back { color: var(--ink); border-color: rgba(24, 20, 17, .2); background: rgba(255, 252, 247, .6); }
+.look-card { position: absolute; z-index: 6; right: var(--gutter); top: 50%; translate: 0 -50%; width: min(370px, 31vw); max-height: calc(100% - 190px); margin-top: 10px; overflow-y: auto; scrollbar-width: none; display: grid; gap: 14px; padding: 22px 22px 16px; border-radius: 26px; background: rgba(255, 252, 247, .96); border: 1px solid rgba(255, 255, 255, .7); box-shadow: 0 30px 80px rgba(70, 45, 20, .18); color: var(--ink); opacity: 0; transform: translateX(24px); pointer-events: none; transition: opacity .5s, transform .5s; }
+.look-card.show { opacity: 1; transform: none; pointer-events: auto; }
+.look-card::-webkit-scrollbar { display: none; }
 .try-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .try-top .kicker { color: var(--accent); font-size: 11px; }
 .try-count { font: 600 12px/1 var(--sans); letter-spacing: .12em; color: var(--mute); }
-.try-info { display: grid; gap: 10px; }
-.try-info .id { font: 600 11px/1 var(--sans); letter-spacing: .14em; color: var(--mute); }
-.try-info h3 { margin: 0; font: 400 clamp(26px, 2.2vw, 32px)/1.08 var(--serif); }
-.try-info .who { font: 600 12px/1.5 var(--sans); color: var(--accent); }
-.try-info .who button { all: unset; cursor: pointer; margin-left: 6px; color: var(--mute); text-decoration: underline; text-underline-offset: 3px; }
-.try-size { display: grid; gap: 14px; }
-.try-size[hidden] { display: none; }
-.try-size p { margin: 0; color: var(--mute); font-size: 14px; }
-.row { display: flex; flex-wrap: wrap; gap: 8px; }
-.try-card .btn { cursor: pointer; }
-.try-actions .btn:first-child { flex: 1; }
-.slider { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 6px 12px; }
-.slider span { font: 700 11px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; color: var(--mute); }
-.slider output { font: 400 26px/1 var(--serif); }
-.slider input { grid-column: 1 / -1; -webkit-appearance: none; appearance: none; width: 100%; height: 24px; margin: 0; background: transparent; cursor: pointer; }
-.slider input::-webkit-slider-runnable-track { height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--f, 50%), var(--line) var(--f, 50%)); }
-.slider input::-moz-range-track { height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--accent) var(--f, 50%), var(--line) var(--f, 50%)); }
-.slider input::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; margin-top: -8.5px; border-radius: 50%; background: #fff; border: 5px solid var(--accent); box-shadow: 0 3px 10px rgba(70, 45, 20, .3); }
-.slider input::-moz-range-thumb { width: 10px; height: 10px; border-radius: 50%; background: #fff; border: 5px solid var(--accent); }
-.slider input:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
-.bodies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.bodies button { all: unset; cursor: pointer; display: grid; gap: 4px; padding: 10px 6px; border-radius: 14px; border: 1px solid var(--line); text-align: center; transition: background .3s, border-color .3s, color .3s; }
-.bodies button:hover { border-color: var(--mute); }
-.bodies button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.bodies b { font: 400 18px/1 var(--serif); }
-.bodies small { font: 600 10px/1.2 var(--sans); color: var(--mute); }
-.bodies button.on { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.bodies button.on small { color: #cbbfae; }
-.try-nav { display: flex; align-items: center; gap: 10px; padding-top: 14px; border-top: 1px solid var(--line); }
+.look-info { display: grid; gap: 10px; }
+.look-info .id { font: 600 11px/1 var(--sans); letter-spacing: .14em; color: var(--mute); }
+.look-info h3 { margin: 0; font: 400 clamp(24px, 2.1vw, 30px)/1.08 var(--serif); }
+.look-info .btn { margin-top: 4px; }
+.try-nav { display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .try-nav .arrow { all: unset; cursor: pointer; flex: none; width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; border: 1px solid var(--line); font: 600 14px/1 var(--sans); transition: background .3s, color .3s; }
 .try-nav .arrow:hover, .try-nav .arrow:focus-visible { background: var(--ink); color: var(--bg); }
 .thumbs { flex: 1; display: flex; justify-content: center; gap: 8px; }
-.thumbs button { all: unset; cursor: pointer; width: 52px; height: 52px; border-radius: 12px; overflow: hidden; opacity: .55; outline: 2px solid transparent; outline-offset: 2px; transition: opacity .3s, outline-color .3s; }
+.thumbs button { all: unset; cursor: pointer; width: 50px; height: 50px; border-radius: 12px; overflow: hidden; opacity: .55; outline: 2px solid transparent; outline-offset: 2px; transition: opacity .3s, outline-color .3s; }
 .thumbs button.on { opacity: 1; outline-color: var(--accent); }
 .thumbs button:focus-visible { outline-color: var(--ink); }
 .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: 33% 45%; transform: scale(1.5); }
@@ -242,13 +219,12 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
   .pick { display: flex; }
   .skip { bottom: auto; top: 76px; }
 }
-/* kiyib ko'rish: telefonda rasm tepada, kartochka ostida — erib o'tish o'rniga oddiy bo'lim */
+/* telefonda kartochka pastda, ixcham: tarkibi va razmerlari katalogda */
 @media (max-width: 760px), (max-aspect-ratio: 4 / 5) {
-  .tryon { margin-top: 0; height: auto; pointer-events: auto; }
-  .try-stage { position: relative; height: auto; min-height: 0; overflow: visible; opacity: 1; background: var(--bg); }
-  .try-media { position: relative; height: 60svh; min-height: 340px; overflow: hidden; }
-  .try-media > * { object-position: 37% 50%; }
-  .try-card { position: relative; right: auto; top: auto; translate: none; width: auto; max-height: none; margin: -44px 12px 44px; overflow: visible; }
+  .look-card { top: auto; bottom: 86px; right: 12px; left: 12px; translate: none; width: auto; max-height: 46%; margin: 0; padding: 16px 16px 12px; gap: 10px; transform: translateY(24px); }
+  .look-card .parts, .look-card .sizes { display: none; }
+  .look-info h3 { font-size: 22px; }
+  .thumbs button { width: 40px; height: 40px; }
 }
 @media (max-width: 760px) {
   .nav nav #navTry { display: none; }

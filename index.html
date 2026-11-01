@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#f5f0e8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,22 +20,22 @@
   </a>
   <nav>
     <a href="#top">Filiallar</a>
-    <a href="#kiyim" id="navTry" hidden>Kiyib ko'rish</a>
+    <a href="#journey" id="navTry" hidden>Kiyib ko'rish</a>
     <a href="#katalog" id="navCatalog" hidden>Katalog</a>
     <a href="#aloqa">Aloqa</a>
   </nav>
 </header>
 
 <!-- 1. INTRO: bulutlardan vodiyga, 3 ta do'kon tanlovi -->
-<section class="intro" id="top" aria-label="Filialni tanlang">
+<section class="intro vmode" id="top" aria-label="Filialni tanlang">
   <!-- skroll introni suradi: bo'lim baland, sahna esa ekranga yopishib turadi -->
   <div class="intro-stage">
     <div class="valley" id="valley">
-      <div class="map" id="introMap"></div>
-      <video id="introVideo" muted playsinline preload="auto" hidden></video>
+      <div class="map" id="introMap" hidden></div>
+      <video id="introVideo" muted playsinline preload="auto" poster="assets/video/intro_start.jpg"></video>
     </div>
-    <div class="sky" id="sky"></div>
-    <div class="clouds" id="clouds" aria-hidden="true"></div>
+    <div class="sky" id="sky" hidden></div>
+    <div class="clouds" id="clouds" aria-hidden="true" hidden></div>
     <div class="intro-title" id="introTitle">
       <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
       <h1>LEGENDA</h1>
@@ -52,7 +52,7 @@
   </div>
 </section>
 
-<!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi -->
+<!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi; eshikdan keyin — kiyimlar (model skroll bilan aylanadi) -->
 <section class="journey" id="journey" hidden aria-label="Do'konga kirish">
   <div class="stage" id="stage">
     <div class="layers" id="layers"></div>
@@ -65,44 +65,22 @@
     <div class="hint" id="hint"><span>Pastga suring</span><i></i></div>
     <div class="steps" id="steps">
       <div class="track"><b id="trackFill"></b></div>
-      <ol><li>Osmon</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li></ol>
+      <ol><li>Osmon</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li><li hidden>Kiyimlar</li></ol>
     </div>
+    <aside class="look-card" id="lookCard" aria-live="polite">
+      <div class="try-top"><span class="kicker">LEGENDA XONASI</span><span class="try-count" id="lookCount"></span></div>
+      <div class="look-info" id="lookInfo"></div>
+      <div class="try-nav">
+        <button type="button" class="arrow" id="lookPrev" aria-label="Oldingi kiyim">←</button>
+        <div class="thumbs" id="lookThumbs"></div>
+        <button type="button" class="arrow" id="lookNext" aria-label="Keyingi kiyim">→</button>
+      </div>
+    </aside>
     <button class="back" id="back" type="button">← Filiallar</button>
   </div>
 </section>
 
-<!-- 3. KIYIB KO'RISH (Andijon): kiyim ilgichda → "Modelda ko'rish" — mos gavdali model shu kiyimda sekin aylanadi.
-     Kino sahnasi ustiga erib tushadi (slayd emas). -->
-<section class="tryon" id="kiyim" hidden aria-label="Kiyib ko'rish">
-  <div class="try-stage" id="tryStage">
-    <div class="try-media" id="tryMedia">
-      <img id="tryA" alt="">
-      <img id="tryB" alt="">
-      <video id="tryV" muted playsinline preload="auto"></video>
-    </div>
-    <aside class="try-card">
-      <div class="try-top"><span class="kicker">LEGENDA XONASI</span><span class="try-count" id="tryCount"></span></div>
-      <div class="try-info" id="tryInfo"></div>
-      <form class="try-size" id="trySize" hidden>
-        <p>Bo'y va vazningizni tanlang — shunday gavdali model kiyib ko'rsatadi.</p>
-        <label class="slider"><span>Bo'y</span><output id="hOut"></output>
-          <input type="range" id="hIn" min="150" max="205" step="1" value="178"></label>
-        <label class="slider"><span>Vazn</span><output id="wOut"></output>
-          <input type="range" id="wIn" min="45" max="150" step="1" value="80"></label>
-        <div class="bodies" id="bodies" aria-label="Gavda"></div>
-        <div class="row"><button class="btn" type="submit">Ko'rsatish →</button><button class="btn ghost" type="button" id="sizeCancel">Bekor</button></div>
-      </form>
-      <div class="row try-actions" id="tryActions"></div>
-      <div class="try-nav">
-        <button type="button" class="arrow" id="tryPrev" aria-label="Oldingi kiyim">←</button>
-        <div class="thumbs" id="tryThumbs"></div>
-        <button type="button" class="arrow" id="tryNext" aria-label="Keyingi kiyim">→</button>
-      </div>
-    </aside>
-  </div>
-</section>
-
-<!-- 4. TANLANGAN DO'KON KATALOGI -->
+<!-- 3. TANLANGAN DO'KON KATALOGI -->
 <section class="catalog" id="katalog" hidden>
   <div class="cat-head">
     <div>
@@ -115,7 +93,7 @@
   <div class="grid" id="grid"></div>
 </section>
 
-<!-- 5. ALOQA: uchala filial -->
+<!-- 4. ALOQA: uchala filial -->
 <section class="contacts" id="aloqa">
   <span class="kicker">ALOQA</span>
   <h2>Uchta filial — <em>bitta Legenda</em></h2>
