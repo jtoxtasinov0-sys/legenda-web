@@ -32,64 +32,31 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .nav nav a { color: inherit; text-decoration: none; font: 600 12px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; opacity: .9; }
 .nav nav a:hover { opacity: 1; text-decoration: underline; text-underline-offset: 6px; }
 
-/* ---------- INTRO ---------- */
-.intro { position: relative; height: 350vh; background: #b9cdb0; }
-.intro-stage { position: sticky; top: 0; height: 100vh; height: 100svh; min-height: 560px; overflow: hidden; }
-.valley { position: absolute; inset: 0; z-index: 1; transform-origin: 50% 60%; will-change: transform; }
-.valley .map, .valley video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.map svg { width: 100%; height: 100%; }
-.sky { position: absolute; inset: 0; z-index: 2; background: linear-gradient(180deg, #5f98d3 0%, #9cc4ea 42%, #dfeaf3 78%, #f3f1ec 100%); will-change: opacity; }
-.clouds { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; }
-.cloud { position: absolute; border-radius: 50%; filter: blur(5px); will-change: transform, opacity; }
-.intro-title { position: absolute; inset: 0; z-index: 4; display: grid; place-content: center; justify-items: center; gap: 14px; text-align: center; color: #fff; text-shadow: 0 2px 40px rgba(40, 70, 110, .45); pointer-events: none; }
-.intro-title h1 { margin: 0; font: 400 clamp(64px, 13vw, 190px)/.9 var(--serif); letter-spacing: .08em; padding-left: .08em; }
-.intro-title .script { font: clamp(26px, 3.6vw, 48px)/1.2 var(--script); color: #fff7ea; }
-.choose { position: absolute; z-index: 5; left: 0; right: 0; top: clamp(84px, 13vh, 140px); text-align: center; color: #fff; text-shadow: 0 2px 24px rgba(20, 35, 20, .55); opacity: 0; transform: translateY(14px); transition: opacity .8s, transform .8s; pointer-events: none; }
-.choose h2 { margin: 10px 0 0; font: 400 clamp(36px, 5vw, 68px)/1 var(--serif); }
-.choose em { color: var(--accent-soft); }
-.choose.show { opacity: 1; transform: none; }
-
-.pins { position: absolute; inset: 0; z-index: 6; pointer-events: none; }
-.pin { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transform: translate(-50%, -100%); opacity: 0; translate: 0 18px; transition: opacity .7s, translate .7s; pointer-events: none; }
-.pin.show { opacity: 1; translate: 0 0; pointer-events: auto; }
-.pin button { all: unset; cursor: pointer; display: flex; align-items: center; gap: 12px; padding: 9px 16px 9px 9px; border-radius: 18px; background: rgba(255, 252, 247, .95); color: var(--ink); box-shadow: 0 18px 44px rgba(20, 30, 20, .28); transition: transform .3s, box-shadow .3s; }
-.pin button:hover, .pin button:focus-visible { transform: translateY(-4px); box-shadow: 0 24px 54px rgba(20, 30, 20, .36); }
-.pin button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.pin img { width: 58px; height: 58px; border-radius: 12px; object-fit: cover; }
-.pin .t { display: grid; gap: 3px; }
-.pin .city { font: 400 27px/1 var(--serif); }
-.pin .sub { font: 700 10px/1 var(--sans); letter-spacing: .22em; color: var(--accent); }
-.pin .go { font: 600 12px/1 var(--sans); color: var(--mute); }
-.pin .stem { width: 2px; height: 46px; background: linear-gradient(rgba(255, 252, 247, .95), rgba(255, 252, 247, .1)); }
-.pin .dot { width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 3px solid #fffcf7; box-shadow: 0 0 0 0 rgba(181, 132, 79, .6); animation: pulse 2.2s infinite; }
-@keyframes pulse { 70% { box-shadow: 0 0 0 16px rgba(181, 132, 79, 0); } 100% { box-shadow: 0 0 0 0 rgba(181, 132, 79, 0); } }
-
-.pick { display: none; position: absolute; z-index: 6; left: 0; right: 0; bottom: 18px; padding: 0 16px; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; }
-.pick::-webkit-scrollbar { display: none; }
-.pick button { all: unset; flex: 0 0 72%; scroll-snap-align: center; cursor: pointer; display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; padding: 10px; border-radius: 18px; background: rgba(255, 252, 247, .95); color: var(--ink); box-shadow: 0 14px 34px rgba(20, 30, 20, .3); opacity: 0; translate: 0 20px; transition: opacity .6s, translate .6s; }
-.pick.show button { opacity: 1; translate: 0 0; }
-.pick img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; }
-.pick .city { font: 400 24px/1 var(--serif); }
-.pick .sub { font: 700 10px/1.6 var(--sans); letter-spacing: .2em; color: var(--accent); }
-.pick .go { display: none; }
-
-.skip { position: absolute; z-index: 7; right: var(--gutter); bottom: 24px; padding: 10px 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .7); background: rgba(255, 255, 255, .18); color: #fff; font: 600 12px/1 var(--sans); letter-spacing: .12em; cursor: pointer; backdrop-filter: blur(6px); transition: opacity .4s; }
-.skip[hidden] { display: none; }
-
-/* Haqiqiy intro video: tugmalar shahar ustida markazda 3 ta karta */
-.intro.vmode .intro-title { background: radial-gradient(ellipse 50% 40% at 50% 50%, rgba(25, 32, 45, .38), transparent 70%); text-shadow: 0 2px 50px rgba(0, 0, 0, .5); }
-.intro.vmode .intro-stage::after { content: ''; position: absolute; inset: 0; z-index: 4; pointer-events: none; background: linear-gradient(180deg, rgba(10, 14, 20, .45), transparent 30%, transparent 60%, rgba(10, 14, 20, .55)); }
-.intro.vmode .pins { display: none; }
-.intro.vmode .pick { display: flex; justify-content: center; gap: 18px; bottom: clamp(28px, 9vh, 90px); overflow: visible; }
-.intro.vmode .pick button { flex: 0 0 auto; width: min(300px, 29vw); grid-template-columns: 78px 1fr; padding: 12px; border-radius: 22px; transition: opacity .6s, translate .6s, transform .3s, box-shadow .3s; }
-.intro.vmode .pick button:hover, .intro.vmode .pick button:focus-visible { transform: translateY(-6px); box-shadow: 0 26px 60px rgba(0, 0, 0, .45); }
-.intro.vmode .pick button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.intro.vmode .pick button:nth-child(2) { transition-delay: .15s; }
-.intro.vmode .pick button:nth-child(3) { transition-delay: .3s; }
-.intro.vmode .pick img { width: 78px; height: 78px; }
-.intro.vmode .pick .city { font-size: 30px; }
-.intro.vmode .pick .go { display: block; margin-top: 6px; font: 600 12px/1 var(--sans); color: var(--mute); }
-.intro.vmode .choose { z-index: 6; }
+/* ---------- BOSH SAHIFA: 3 ta filial ---------- */
+/* uchta shahar yonma-yon; kursor ostidagisi kengayadi. Telefonda — ustma-ust uchta tasma */
+.start { position: relative; height: 100vh; height: 100svh; min-height: 560px; overflow: hidden; background: #0d0b0a; color: #fff; }
+.start-head { position: absolute; z-index: 2; left: 0; right: 0; top: 0; padding: clamp(96px, 15vh, 150px) var(--gutter) 0; text-align: center; pointer-events: none; text-shadow: 0 2px 30px rgba(0, 0, 0, .5); }
+.start-head .kicker { color: var(--accent-soft); }
+.start-head h1 { margin: 14px 0 0; font: 400 clamp(38px, 5.4vw, 76px)/1 var(--serif); }
+.start-head em { color: var(--accent-soft); }
+.cities { position: absolute; inset: 0; display: flex; }
+.city { all: unset; position: relative; flex: 1 1 0; min-width: 0; overflow: hidden; cursor: pointer; transition: flex-grow .7s cubic-bezier(.2, .7, .2, 1); }
+.city + .city { border-left: 1px solid rgba(255, 255, 255, .16); }
+.city img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.04); filter: brightness(.8); transition: transform 1.2s cubic-bezier(.2, .7, .2, 1), filter .7s; }
+.city::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(10, 12, 16, .62), rgba(10, 12, 16, 0) 36%, rgba(10, 12, 16, 0) 50%, rgba(10, 12, 16, .8)); }
+.city .t { position: absolute; z-index: 1; left: clamp(20px, 3vw, 44px); right: 20px; bottom: clamp(36px, 8vh, 80px); display: grid; justify-items: start; gap: 8px; }
+.city .kicker { color: var(--accent-soft); font-size: 11px; }
+.city .name { font: 400 clamp(40px, 4.6vw, 72px)/1 var(--serif); }
+.city .addr { font: 500 14px/1.4 var(--sans); opacity: .85; }
+.city .go { margin-top: 10px; padding: 11px 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .6); font: 600 12px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; transition: background .4s, color .4s, border-color .4s; }
+.city .go i { display: inline-block; font-style: normal; transition: translate .4s; }
+.city:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: -6px; }
+@media (hover: hover) {
+  .city:hover { flex-grow: 1.7; }
+  .city:hover img { transform: scale(1.1); filter: brightness(.95); }
+  .city:hover .go { background: var(--bg); color: var(--ink); border-color: var(--bg); }
+  .city:hover .go i { translate: 4px 0; }
+}
 
 /* ---------- JOURNEY ---------- */
 .journey { position: relative; height: 520vh; background: #0d0b0a; }
@@ -214,10 +181,18 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .foot { display: flex; justify-content: space-between; gap: 16px; padding: 22px var(--gutter); background: #120f0d; color: #8d8073; font: 600 11px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; }
 
 /* ---------- TELEFON / TOR EKRAN ---------- */
+/* bosh sahifa: sarlavha tepada, uchta shahar ustma-ust tasma bo'lib */
 @media (max-aspect-ratio: 4 / 5), (max-width: 640px) {
-  .pins { display: none; }
-  .pick { display: flex; }
-  .skip { bottom: auto; top: 76px; }
+  .start { display: flex; flex-direction: column; }
+  .start-head { position: relative; padding: 92px 16px 20px; }
+  .start-head h1 { font-size: clamp(30px, 8.6vw, 44px); }
+  .cities { position: relative; flex: 1; flex-direction: column; }
+  .city + .city { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .16); }
+  .city::after { background: linear-gradient(180deg, rgba(10, 12, 16, .1), rgba(10, 12, 16, .7)); }
+  .city .t { left: 18px; right: 18px; bottom: 16px; gap: 4px; }
+  .city .name { font-size: 34px; }
+  .city .addr { display: none; }
+  .city .go { position: absolute; right: 0; bottom: 0; margin: 0; padding: 9px 14px; font-size: 11px; }
 }
 /* telefonda kartochka pastda, ixcham: tarkibi va razmerlari katalogda */
 @media (max-width: 760px), (max-aspect-ratio: 4 / 5) {
@@ -228,14 +203,10 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 }
 @media (max-width: 760px) {
   .nav nav #navTry { display: none; }
-  .intro.vmode .pick { justify-content: flex-start; overflow-x: auto; }
-  .intro.vmode .pick button { width: 72%; grid-template-columns: 64px 1fr; }
-  .intro.vmode .pick img { width: 64px; height: 64px; }
   .nav { padding: 14px 16px; }
   .nav nav { gap: 16px; }
   .nav nav a[href="#top"] { display: none; }
   .brand { letter-spacing: .3em; font-size: 13px; }
-  .choose { top: 92px; }
   .cap { bottom: 110px; }
   .steps ol { font-size: 9px; letter-spacing: .14em; }
   .back { top: 70px; }
@@ -251,7 +222,6 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
   .foot { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .intro { height: auto; }
-  .pin .dot, .hint i { animation: none; }
-  .card, .ph img, .pin button { transition: none; }
+  .hint i { animation: none; }
+  .card, .ph img, .city, .city img { transition: none; }
 }

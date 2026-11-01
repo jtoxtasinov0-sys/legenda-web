@@ -10,6 +10,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<!-- Andijon kinosining birinchi klipi (1.8 MB) bo'sh vaqtda oldindan — karta bosilganda darhol boshlansin -->
+<link rel="prefetch" href="assets/video/andijon_B.mp4">
 </head>
 <body>
 
@@ -26,30 +28,13 @@
   </nav>
 </header>
 
-<!-- 1. INTRO: bulutlardan vodiyga, 3 ta do'kon tanlovi -->
-<section class="intro vmode" id="top" aria-label="Filialni tanlang">
-  <!-- skroll introni suradi: bo'lim baland, sahna esa ekranga yopishib turadi -->
-  <div class="intro-stage">
-    <div class="valley" id="valley">
-      <div class="map" id="introMap" hidden></div>
-      <video id="introVideo" muted playsinline preload="auto" poster="assets/video/intro_start.jpg"></video>
-    </div>
-    <div class="sky" id="sky" hidden></div>
-    <div class="clouds" id="clouds" aria-hidden="true" hidden></div>
-    <div class="intro-title" id="introTitle">
-      <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
-      <h1>LEGENDA</h1>
-      <span class="script">3 shahar — bitta uslub</span>
-    </div>
-    <div class="choose" id="choose">
-      <span class="kicker">FARG'ONA VODIYSI</span>
-      <h2>Qaysi filialga <em>kiramiz?</em></h2>
-    </div>
-    <div class="pins" id="pins"></div>
-    <div class="pick" id="pick"></div>
-    <div class="hint" id="introHint"><span>Pastga suring</span><i></i></div>
-    <button class="skip" id="skip" type="button">O'tkazib yuborish</button>
+<!-- 1. BOSH SAHIFA: 3 ta filial (Higgsfield yasagan shahar rasmlari), bosilsa — do'konga safar -->
+<section class="start" id="top" aria-label="Filialni tanlang">
+  <div class="start-head">
+    <span class="kicker">Erkaklar kiyim do'konlari · Farg'ona vodiysi</span>
+    <h1>Qaysi filialga <em>kiramiz?</em></h1>
   </div>
+  <div class="cities" id="cities"></div>
 </section>
 
 <!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi; eshikdan keyin — kiyimlar (model skroll bilan aylanadi) -->
@@ -65,7 +50,7 @@
     <div class="hint" id="hint"><span>Pastga suring</span><i></i></div>
     <div class="steps" id="steps">
       <div class="track"><b id="trackFill"></b></div>
-      <ol><li>Osmon</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li><li hidden>Kiyimlar</li></ol>
+      <ol><li>Shahar</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li><li hidden>Kiyimlar</li></ol>
     </div>
     <aside class="look-card" id="lookCard" aria-live="polite">
       <div class="try-top"><span class="kicker">LEGENDA XONASI</span><span class="try-count" id="lookCount"></span></div>
