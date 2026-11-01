@@ -1,4 +1,4 @@
-/* Legenda sayti: intro (bulutlar → vodiy) → filial tanlash → skroll bilan do'konga kirish → katalog.
+/* Legenda sayti: 3 ta filial kartasi → skroll bilan do'konga kirish (kino) → kiyimlar → katalog.
  *
  * Higgsfield kliplari tayyor bo'lsa (assets/video/...), sayt o'zi ularni ishlatadi;
  * bo'lmasa — haqiqiy filial rasmlaridan yasalgan vaqtinchalik animatsiya ko'rsatiladi.
@@ -17,244 +17,49 @@
   const tel = s => 'tel:' + s.replace(/[^\d+]/g, '');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Vodiy kadri 1600x900. pin — chizilgan xaritadagi joy; vpin — Higgsfield intro videosining oxirgi kadridagi shahar;
-  // side — o'sha kadrda qaysi tomonga sho'ng'ish (% eni).
+  // card — bosh sahifa kartasi (Higgsfield yasagan shahar ko'rinishi); kinosiz filialda safar ham shundan boshlanadi.
+  // thumb — aloqa bo'limidagi kichik rasm; door — eshik (rasmlar shu nuqtaga yaqinlashadi).
   const STORES = {
     shahrixon: {
-      city: 'Shahrixon', title: 'Legenda Premium', pin: [330, 600], vpin: [200, 545], side: 12,
+      city: 'Shahrixon', title: 'Legenda Premium',
       street: "Hamza ko'chasi", address: "Shahrixon sh., Hamza ko'chasi", landmark: "2-maktab oldida",
       phones: ['+998 93 372 88 55'], hours: null,
       insta: 'legenda_shahrixon', tg: 'https://t.me/Legenda_Premium1',
       day: 'assets/filial/shahrixon_kun.jpg', night: null, inside: 'assets/filial/shahrixon_ichkari.jpg',
-      thumb: 'assets/filial/shahrixon_kun_kichik.jpg', door: [50, 58],
+      thumb: 'assets/filial/shahrixon_kun_kichik.jpg', card: 'assets/filial/shahrixon_karta.jpg', door: [50, 58],
     },
     asaka: {
-      city: 'Asaka', title: 'Legenda Premium', pin: [800, 680], vpin: [800, 600], side: 50,
+      city: 'Asaka', title: 'Legenda Premium',
       street: "Sharq to'yxonasi, 1-qavat", address: "Asaka sh., Imom Buxoriy ko'chasi", landmark: "Sharq to'yxonasi, 1-qavat",
       phones: ['+998 50 117 11 55'], hours: null,
       insta: 'legenda_premium_asaka', tg: null,
       // Asakadan faqat kechki vitrina rasmi bor — kunduzgi ko'rinish shu rasmdan filtr bilan olinadi
       day: 'assets/filial/asaka_tun.jpg', dayify: true, night: null, inside: 'assets/filial/asaka_ichkari.jpg',
-      thumb: 'assets/filial/asaka_resepshn_kichik.jpg', door: [48, 52],
+      thumb: 'assets/filial/asaka_resepshn_kichik.jpg', card: 'assets/filial/asaka_karta.jpg', door: [48, 52],
     },
     andijon: {
-      city: 'Andijon', title: 'Legenda Andijon', pin: [1270, 560], vpin: [1430, 505], side: 89,
+      city: 'Andijon', title: 'Legenda Andijon',
       street: "Furqat ko'chasi, 136-uy", address: "Andijon sh., Furqat ko'chasi 136-uy", landmark: "Oq laylak to'yxonasi oldida",
       phones: ['+998 88 480 71 71', '+998 93 100 78 13'], hours: 'har kuni 08:00 – 02:00',
       insta: 'legenda_andijon', tg: 'https://t.me/LEGENDA_AND1',
       day: 'assets/filial/andijon_kun.jpg', night: 'assets/filial/andijon_tun.jpg', inside: 'assets/filial/andijon_ichkari.jpg',
-      thumb: 'assets/filial/andijon_tun_kichik.jpg', door: [50, 60],
+      thumb: 'assets/filial/andijon_tun_kichik.jpg', card: 'assets/filial/andijon_karta.jpg', door: [50, 60],
     },
   };
-  const ORDER = ['shahrixon', 'asaka', 'andijon']; // xaritada chapdan o'ngga (g'arbdan sharqqa)
+  const ORDER = ['shahrixon', 'asaka', 'andijon']; // chapdan o'ngga (g'arbdan sharqqa)
   const CAT = { "Ko'ylak": "Ko'ylak", 'Oyoq kiyim': 'Oyoq kiyim', Komplekt: 'Tayyor look', Kurtka: 'Kurtka', Kostyum: 'Kostyum', Kardigan: 'Kardigan', Jilet: 'Jilet' };
   const PRODUCTS = window.LEGENDA_PRODUCTS || [];
 
-  /* ---------- Vodiy xaritasi (intro.mp4 bo'lmaguncha) ---------- */
-
-  function rng(seed) {
-    return () => {
-      seed = (seed + 0x6d2b79f5) | 0;
-      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-    };
-  }
-
-  // chizilgan vodiy (~1500 element) faqat intro videosi bo'lmasa kerak — o'shanda bir marta yasaladi
-  let mapCache = null;
-  const mapSvg = () => mapCache || (mapCache = drawMap());
-  function drawMap() {
-    const r = rng(20261031), H0 = 250, f = n => n.toFixed(1);
-    const pick = a => a[Math.floor(r() * a.length)];
-    const depth = y => clamp((y - H0) / (900 - H0)); // ufqda 0, pastda 1
-    let s = '';
-
-    // tog'lar (ufqda)
-    const ridge = (base, amp, seed, fill) => {
-      const q = rng(seed); let d = `M0 ${H0 + 40} `;
-      const ph = [q() * 6, q() * 6, q() * 6];
-      for (let x = 0; x <= 1600; x += 16) {
-        const y = base - amp * (0.55 + 0.25 * Math.sin(x / 140 + ph[0]) + 0.15 * Math.sin(x / 47 + ph[1]) + 0.08 * Math.sin(x / 19 + ph[2]));
-        d += `L${x} ${f(y)} `;
-      }
-      return `<path d="${d}L1600 ${H0 + 40} Z" fill="${fill}"/>`;
-    };
-    s += ridge(232, 150, 3, 'url(#gSnow)') + ridge(246, 80, 9, '#97a8b0') + ridge(258, 34, 13, '#8c9f88');
-
-    // dalalar — yer tekisligi perspektivasi: chetlari ufqdagi bitta nuqtaga yig'iladi
-    const FIELD = ['#86a96a', '#9bb878', '#7a9d5e', '#a9c287', '#b8c48f', '#cbc89c', '#8fae6f', '#6f9356', '#b3b98a', '#9fb27a', '#c4b98c', '#7e9f63'];
-    for (let y = 900; y > H0 + 34;) {
-      const k = depth(y), h = Math.min(y - H0 - 26, lerp(7, 66, k) * (0.7 + r() * 0.6)), yt = y - h;
-      const ratio = (yt - H0) / (y - H0), proj = x => 800 + (x - 800) * ratio;
-      const reach = 900 / ratio;
-      for (let x = 800 - reach - 40; x < 800 + reach + 40;) {
-        const w = lerp(26, 170, k) * (0.5 + r() * 1.0), x2 = x + w, gap = lerp(0.6, 3.2, k);
-        if (x2 > -60 && x < 1660 || proj(x2) > -60 && proj(x) < 1660) {
-          s += `<polygon points="${f(x)},${f(y)} ${f(x2)},${f(y)} ${f(proj(x2))},${f(yt)} ${f(proj(x))},${f(yt)}" fill="${pick(FIELD)}" opacity="${(0.6 + r() * 0.4).toFixed(2)}"/>`;
-          // yaqindagi katta dalalarda ekin qatorlari
-          if (k > 0.55 && r() < 0.3) for (let q = 1; q < 6; q++) {
-            const xa = x + (w * q) / 6;
-            s += `<line x1="${f(xa)}" y1="${f(y)}" x2="${f(proj(xa))}" y2="${f(yt)}" stroke="#f3f0d8" stroke-width=".8" opacity=".25"/>`;
-          }
-        }
-        x = x2 + gap;
-      }
-      // daraxt qatorlari (terak)
-      if (r() < 0.45) {
-        const xa = r() * 1600, xb = xa + (r() < .5 ? -1 : 1) * lerp(200, 700, r());
-        s += `<line x1="${f(xa)}" y1="${f(y)}" x2="${f(xb)}" y2="${f(y)}" stroke="#3f5f33" stroke-width="${f(lerp(1, 5, k))}" stroke-linecap="round" opacity=".7"/>`;
-      }
-      y = yt - lerp(0.6, 3.2, k);
-    }
-
-    // bulut soyalari
-    for (let i = 0; i < 7; i++) s += `<ellipse cx="${f(r() * 1600)}" cy="${f(380 + r() * 520)}" rx="${f(140 + r() * 220)}" ry="${f(50 + r() * 80)}" fill="url(#gShade)"/>`;
-
-    // daryo
-    let rv = '';
-    for (let x = -30; x <= 1640; x += 20) rv += `${x === -30 ? 'M' : 'L'}${x} ${f(800 + 36 * Math.sin(x / 190) + 15 * Math.sin(x / 57 + 1.3) - (x / 1600) * 120)} `;
-    s += `<path d="${rv}" fill="none" stroke="#6f97a6" stroke-width="15" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>`;
-    s += `<path d="${rv}" fill="none" stroke="#b7d4dd" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity=".9"/>`;
-
-    // yo'llar
-    const P = Object.fromEntries(ORDER.map(k => [k, STORES[k].pin]));
-    const road = d => `<path d="${d}" fill="none" stroke="#7a6a52" stroke-width="5" opacity=".35"/><path d="${d}" fill="none" stroke="#f1e7d2" stroke-width="2.6" opacity=".95"/>`;
-    s += road(`M-20 640 Q 160 610 ${P.shahrixon[0]} ${P.shahrixon[1]}`);
-    s += road(`M${P.shahrixon[0]} ${P.shahrixon[1]} Q 560 700 ${P.asaka[0]} ${P.asaka[1]}`);
-    s += road(`M${P.asaka[0]} ${P.asaka[1]} Q 1040 650 ${P.andijon[0]} ${P.andijon[1]}`);
-    s += road(`M${P.andijon[0]} ${P.andijon[1]} Q 1440 520 1620 470`);
-    s += road(`M${P.asaka[0]} ${P.asaka[1]} Q 760 800 700 920`);
-    s += road(`M${P.andijon[0]} ${P.andijon[1]} Q 1330 420 1390 290`);
-
-    // shaharchalar: tomlar va daraxtlar
-    const ROOF = ['#dcd5c8', '#c7bba9', '#b8a48d', '#ebe5da', '#a8785c', '#cfc7ba', '#9a8a78', '#e3d9c6'];
-    ORDER.forEach((key, i) => {
-      const [cx, cy] = STORES[key].pin, q = rng(100 + i);
-      s += `<ellipse cx="${cx}" cy="${cy}" rx="150" ry="70" fill="url(#gTown)"/>`;
-      for (let n = 0; n < 190; n++) {
-        const a = q() * Math.PI * 2, d = Math.sqrt(q());
-        const x = cx + Math.cos(a) * d * 125, y = cy + Math.sin(a) * d * 52, k = depth(y);
-        const w = lerp(4, 13, k) * (0.6 + q()), h = w * (0.55 + q() * 0.5);
-        s += `<rect x="${f(x)}" y="${f(y)}" width="${f(w)}" height="${f(h)}" fill="${ROOF[Math.floor(q() * ROOF.length)]}" transform="rotate(${f(-8 + q() * 16)} ${f(x)} ${f(y)})"/>`;
-      }
-      for (let n = 0; n < 70; n++) {
-        const a = q() * Math.PI * 2, d = 0.3 + q() * 0.9;
-        const x = cx + Math.cos(a) * d * 150, y = cy + Math.sin(a) * d * 64;
-        s += `<circle cx="${f(x)}" cy="${f(y)}" r="${f(lerp(1.8, 5.5, depth(y)) * (0.7 + q() * 0.6))}" fill="#46633a" opacity=".85"/>`;
-      }
-      s += `<circle cx="${cx}" cy="${cy}" r="90" fill="url(#gPin)"/>`;
-    });
-
-    // osmon va ufqdagi tuman
-    const defs = `<defs>
-      <linearGradient id="gGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fb497"/><stop offset=".45" stop-color="#6f8f58"/><stop offset="1" stop-color="#4b6a3b"/></linearGradient>
-      <linearGradient id="gSky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8fb9df"/><stop offset="1" stop-color="#e3ecef"/></linearGradient>
-      <linearGradient id="gSnow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffffff"/><stop offset=".45" stop-color="#d9e2ea"/><stop offset="1" stop-color="#a9b8c2"/></linearGradient>
-      <linearGradient id="gHaze" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4f1ea" stop-opacity="0"/><stop offset=".42" stop-color="#eef0ea" stop-opacity=".75"/><stop offset="1" stop-color="#eef0ea" stop-opacity="0"/></linearGradient>
-      <radialGradient id="gShade"><stop offset="0" stop-color="#1b2a14" stop-opacity=".16"/><stop offset="1" stop-color="#1b2a14" stop-opacity="0"/></radialGradient>
-      <radialGradient id="gTown"><stop offset="0" stop-color="#cbbfa8" stop-opacity=".75"/><stop offset="1" stop-color="#cbbfa8" stop-opacity="0"/></radialGradient>
-      <radialGradient id="gPin"><stop offset="0" stop-color="#ffd59a" stop-opacity=".55"/><stop offset="1" stop-color="#ffd59a" stop-opacity="0"/></radialGradient>
-    </defs>`;
-    return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs}
-      <rect width="1600" height="900" fill="url(#gGround)"/><rect width="1600" height="${H0 + 20}" fill="url(#gSky)"/>
-      ${s}<rect y="150" width="1600" height="300" fill="url(#gHaze)"/></svg>`;
-  }
-
-  // 1600x900 kadrdagi nuqtani "cover" qilingan ekran nuqtasiga aylantiradi
-  function coverPoint([x, y], w, h) {
-    const s = Math.max(w / 1600, h / 900);
-    return [(w - 1600 * s) / 2 + x * s, (h - 900 * s) / 2 + y * s];
-  }
-
-  /* ---------- INTRO ---------- */
-
-  const intro = $('#top'), sky = $('#sky'), valley = $('#valley'), cloudsEl = $('#clouds');
-  const introTitle = $('#introTitle'), choose = $('#choose'), pinsEl = $('#pins'), pickEl = $('#pick'), skip = $('#skip');
-  const introHint = $('#introHint'), introMap = $('#introMap'), introVideo = $('#introVideo');
-
-  const clouds = [];
-  function makeClouds() {
-    const r = rng(7);
-    for (let i = 0; i < 40; i++) {
-      const d = r(), w = lerp(38, 105, d), el = document.createElement('div');
-      const x = -12 + r() * 124, y = 38 + r() * 80; // boshida bulut dengizi pastda, tepada osmon
-      el.className = 'cloud';
-      el.style.width = w + 'vmax'; el.style.height = w * 0.56 + 'vmax';
-      el.style.left = x + '%'; el.style.top = y + '%';
-      const a = 0.82 + d * 0.18;
-      el.style.background = [
-        `radial-gradient(circle at ${28 + r() * 10}% ${40 + r() * 10}%, rgba(255,255,255,${a}) 0 20%, rgba(255,255,255,0) 44%)`,
-        `radial-gradient(circle at ${60 + r() * 12}% ${36 + r() * 10}%, rgba(255,255,255,${a}) 0 18%, rgba(255,255,255,0) 42%)`,
-        `radial-gradient(ellipse at 50% 56%, rgba(255,255,255,${a}) 0 32%, rgba(250,252,255,.7) 48%, rgba(255,255,255,0) 68%)`,
-        `radial-gradient(ellipse at 50% 82%, rgba(158,182,210,.5) 0 26%, rgba(158,182,210,0) 58%)`,
-      ].join(',');
-      el.style.zIndex = Math.round(d * 10);
-      cloudsEl.appendChild(el);
-      clouds.push({ el, d, x, y });
-    }
-  }
-
-  function applyIntro(t) {
-    // 1) kamera pastga tushadi — bulutlar yuqoriga ko'tarilib ekranni qoplaydi
-    // 2) bulut ichidan o'tamiz — ular chetlarga tarqaladi va ostidan vodiy ochiladi
-    const rise = ease(clamp(t / 0.48)), part = ease(ramp(t, 0.42, 1));
-    for (const c of clouds) {
-      const cy = c.y - rise * (42 + 30 * c.d);
-      const dx = (c.x - 50) * part * (1.3 + 3.2 * c.d), dy = (cy - 50) * part * (1.3 + 3.2 * c.d);
-      const sc = 1 + rise * 0.5 * c.d + part * (1.2 + 3 * c.d);
-      c.el.style.transform = `translate(-50%,-50%) translate(${dx.toFixed(2)}vw,${(cy - c.y + dy).toFixed(2)}vh) scale(${sc.toFixed(3)})`;
-      c.el.style.opacity = (1 - ramp(t, 0.5 + 0.22 * (1 - c.d), 0.82 + 0.16 * (1 - c.d))).toFixed(3);
-    }
-    sky.style.opacity = 1 - ramp(t, 0.45, 0.78);
-    valley.style.transform = `scale(${lerp(1.55, 1, ease(ramp(t, 0.25, 1)))})`;
-    introTitle.style.opacity = 1 - ramp(t, 0.1, 0.3);
-    introTitle.style.transform = `translateY(${-ramp(t, 0.1, 0.3) * 40}px)`;
-  }
-
-  // Higgsfield intro.mp4 — sahifa video bilan ochiladi (index.html: poster, .vmode). Video ochilmasa (fayl yo'q) —
-  // chizilgan xarita va bulutlar yasaladi.
-  let VMODE = true;
-  let INTRO_VIDEO = null; // o'sha <video>, birinchi kadri kelgach
-  function drawIntro() {
-    VMODE = false; intro.classList.remove('vmode');
-    introVideo.hidden = true; introMap.innerHTML = mapSvg(); introMap.hidden = false;
-    sky.hidden = false; cloudsEl.hidden = false; makeClouds();
-    if (J && J.L.map) J.L.map.innerHTML = mapSvg();
-    placePins(); sizeJourneyMap(); render();
-  }
-  let introShown = false; // tanlov (sarlavha + kartalar) ko'rinib turibdimi
-  function placePins() {
-    const b = valley.getBoundingClientRect();
-    pinsEl.querySelectorAll('.pin').forEach(p => {
-      const st = STORES[p.dataset.key], [x, y] = coverPoint(VMODE ? st.vpin : st.pin, b.width, b.height);
-      p.style.left = x + 'px'; p.style.top = y + 'px';
-      // karta ekrandan chiqib ketmasin: nuqta joyida qoladi, karta ichkariga suriladi
-      const btn = p.querySelector('button'), w = btn.offsetWidth, pad = 16;
-      const shift = clamp(x - w / 2, pad, Math.max(pad, b.width - pad - w)) - (x - w / 2);
-      btn.style.translate = `${shift}px 0`;
-    });
-  }
-  // Skroll intro bo'limining qayerida: 0 — tepasi (osmon), 1 — oxiri (vodiy, tanlov)
-  function introProgress() {
-    if (reduced) return 1;
-    const len = intro.offsetHeight - innerHeight;
-    return len > 0 ? clamp((scrollY - intro.offsetTop) / len) : 1;
-  }
-  const introEndY = () => intro.offsetTop + Math.max(0, intro.offsetHeight - innerHeight);
-
-  function showChoice(on) {
-    if (on === introShown) return;
-    introShown = on;
-    if (on) placePins();
-    choose.classList.toggle('show', on);
-    pickEl.classList.toggle('show', on);
-    pinsEl.querySelectorAll('.pin').forEach((p, i) => {
-      clearTimeout(p.showTimer);
-      if (on) p.showTimer = setTimeout(() => p.classList.add('show'), reduced ? 0 : 250 + i * 180);
-      else p.classList.remove('show');
-    });
-  }
+  /* ---------- BOSH SAHIFA: 3 ta filial ---------- */
+  // Uchta shahar kartasi; bosilsa — o'sha do'konga safar (Andijon: do'kon tepasidagi dron kadridan)
+  $('#cities').innerHTML = ORDER.map(key => {
+    const st = STORES[key];
+    return `<button class="city" type="button" data-key="${key}" aria-label="${esc(st.city)} filialiga kirish">
+      <img src="${st.card}" alt="" decoding="async">
+      <span class="t"><span class="kicker">${esc(st.title)}</span><span class="name">${esc(st.city)}</span>
+        <span class="addr">${esc(st.street)}</span><span class="go">Do’konga kirish <i>→</i></span></span></button>`;
+  }).join('');
+  $('#cities').addEventListener('click', e => { const b = e.target.closest('[data-key]'); if (b) enter(b.dataset.key); });
 
   // Video skrolldan biroz orqada "suzib" boradi — g'ildirak qadamlari sakramasin.
   // Keyingi seek oldingisi tugagach ('seeked') beriladi: dekoder qancha tez bo'lsa, shuncha tez,
@@ -276,41 +81,6 @@
     return s;
   }
   const seekTo = (v, want) => Math.abs(v.currentTime - want) > 0.004 && ((v.currentTime = want), true);
-  const introScrub = scrubber(
-    () => !INTRO_VIDEO || !INTRO_VIDEO.duration || INTRO_VIDEO.seeking,
-    t => seekTo(INTRO_VIDEO, t * (INTRO_VIDEO.duration - 0.05)));
-
-  function renderIntro(p) {
-    if (VMODE) {
-      introScrub.target = p; introScrub.run();
-      introTitle.style.opacity = 1 - ramp(p, 0.03, 0.16);
-      introTitle.style.transform = `translateY(${-ramp(p, 0.03, 0.16) * 40}px)`;
-    } else {
-      applyIntro(p);
-    }
-    introHint.style.opacity = p < 0.02 ? 1 : 0;
-    skip.hidden = p > 0.9;
-    showChoice(p > 0.96);
-  }
-  skip.addEventListener('click', () => window.scrollTo({ top: introEndY(), behavior: 'smooth' }));
-
-  // Tanlov tugmalari: kompyuterda xaritadagi pinlar, telefonda pastdagi kartalar
-  ORDER.forEach(key => {
-    const st = STORES[key];
-    const pin = document.createElement('div');
-    pin.className = 'pin'; pin.dataset.key = key;
-    pin.innerHTML = `<button type="button" aria-label="${esc(st.city)} filialiga kirish"><img src="${st.thumb}" alt=""><span class="t">
-      <span class="sub">${esc(st.title.toUpperCase())}</span><span class="city">${esc(st.city)}</span><span class="go">Kirish →</span></span></button>
-      <span class="stem"></span><span class="dot"></span>`;
-    pin.querySelector('button').addEventListener('click', () => enter(key));
-    pinsEl.appendChild(pin);
-
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.innerHTML = `<img src="${st.thumb}" alt=""><span><span class="sub">${esc(st.title.toUpperCase())}</span><br><span class="city">${esc(st.city)}</span><span class="go">Do’konga kirish →</span></span>`;
-    card.addEventListener('click', () => enter(key));
-    pickEl.appendChild(card);
-  });
 
   /* ---------- DO'KONGA KIRISH ---------- */
 
@@ -329,9 +99,9 @@
   async function buildJourney(key) {
     const st = STORES[key];
     layersEl.innerHTML = ''; capEl.innerHTML = ''; stage.classList.remove('film');
-    // haqiqiy intro bo'lsa — uning oxirgi kadridan sho'ng'iymiz, bo'lmasa chizilgan xaritadan.
+    // bosh sahifadagi shahar kartasidan boshlaymiz (kino yuklanguncha ham shu ko'rinadi).
     // Filial rasmlari faqat kinosiz animatsiya uchun — kino (FILMS) bo'lsa ular yuklanmaydi.
-    const L = { map: layer(VMODE ? '<img src="assets/video/intro_end.jpg" alt="">' : mapSvg()), day: null, night: null, inside: null };
+    const L = { map: layer(`<img src="${st.card}" alt="">`), day: null, night: null, inside: null };
     const photos = () => {
       L.day = layer(`<img src="${st.day}" alt="">`);
       L.night = st.night ? layer(`<img src="${st.night}" alt="">`) : null;
@@ -359,7 +129,7 @@
     (J && J.blobs || []).forEach(u => URL.revokeObjectURL(u));
     J = { key, st, L, caps, film: null, cur: -1, look: -1, blobs: [], phases: [0, .24, .45, .72, 1] };
     journey.style.height = '';
-    sizeJourneyMap();
+    stepsLi[4].hidden = true; // "Kiyimlar" — faqat kinoda kiyimlar bo'lsa
 
     // Higgsfield kliplari bo'lsa — kadrlar o'rniga kino. Tahrir (FILMS) bo'lmasa yoki uning fayllaridan biri
     // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D). Avval faqat videolarning boshi (metadata,
@@ -406,8 +176,9 @@
   // berilmasa — uzunligi); fade — oldingi kadrdan shuncha soniyada erib o'tish; push — rasm sekin yaqinlashishi;
   // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi.
   const FILMS = {
-    // eshikdan kirgach — kiyimlar: har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
-    andijon: [{ c: 'A' }, { c: 'B', fade: 0.8 }, { c: 'C' }, { c: 'D' }, { c: 'E' },
+    // do'kon tepasidagi dron kadridan (B, 1 s — sekinroq suriladi) boshlanadi; eshikdan kirgach — kiyimlar:
+    // har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
+    andijon: [{ c: 'B', w: 2.5 }, { c: 'C' }, { c: 'D' }, { c: 'E' },
       { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', w: 8, fade: 1, look: 0 },
       { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', w: 8, fade: 1, look: 1 },
       { img: 'kiyim/ilgich_LG-013', w: 1.8, fade: 1, push: 0.03, look: 2 }, { img: 'kiyim/orta_LG-013', w: 3, fade: 1, push: 0.03, look: 2 }],
@@ -489,13 +260,6 @@
     showLook(F[i].look);
   }
 
-  function sizeJourneyMap() {
-    if (!J || !J.L.map) return;
-    if (VMODE) { J.L.map.style.transformOrigin = `${J.st.side}% 62%`; return; }
-    const [x, y] = coverPoint(J.st.pin, stage.clientWidth, stage.clientHeight);
-    J.L.map.style.transformOrigin = `${x}px ${y}px`;
-  }
-
   // ~21vh skroll = kinoning 1 soniyasi
   function sizeJourney() {
     if (J && J.film) journey.style.height = `${100 + 21 * J.total}vh`;
@@ -521,9 +285,9 @@
       [ovDay, ovNight, ovGlow, ovWarm].forEach(o => (o.style.opacity = 0));
     } else {
       const hasNight = !!L.night;
-      // A: vodiydan shaharcha ustiga sho'ng'ish
+      // A: shahar kartasidan do'kon tomon sho'ng'ish
       const a = ease(ramp(p, 0, P[1]));
-      setLayer(L.map, 1 - ramp(p, P[1] - 0.07, P[1] + 0.02), lerp(1, 7.5, a), `blur(${(ramp(p, P[1] - 0.08, P[1]) * 8).toFixed(1)}px)`);
+      setLayer(L.map, 1 - ramp(p, P[1] - 0.07, P[1] + 0.02), lerp(1, 2.6, a), `blur(${(ramp(p, P[1] - 0.08, P[1]) * 8).toFixed(1)}px)`);
       // B → C: kunduzgi fasad, keyin qorong'ilashadi
       const dusk = ramp(p, P[2], P[3] - 0.02);
       const dayIn = ramp(p, P[1] - 0.08, P[1] + 0.02);
@@ -664,46 +428,31 @@
     navTry.hidden = !(FILMS[key] && FILMS[key].some(x => x.look != null));
     history.replaceState(null, '', '#' + key);
     requestAnimationFrame(() => {
-      sizeJourneyMap(); render();
+      render();
       window.scrollTo({ top: journey.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
     });
   }
-  // "← Filiallar": intro boshiga emas, tanlov turgan oxiriga
-  $('#back').addEventListener('click', () => window.scrollTo({ top: introEndY(), behavior: reduced ? 'auto' : 'smooth' }));
+  // "← Filiallar": bosh sahifadagi kartalarga
+  $('#back').addEventListener('click', () => window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
 
   let ticking = false;
   function render() {
     ticking = false;
     // avval hamma o'lchamlar o'qiladi, keyin uslublar yoziladi — brauzer har kadrda sahifani qayta hisoblamaydi
-    const y = scrollY, ip = introProgress(), introEnd = introEndY();
-    const live = J && !journey.hidden, top = journey.offsetTop, h = journey.offsetHeight;
+    const y = scrollY, live = J && !journey.hidden, top = journey.offsetTop, h = journey.offsetHeight;
     const jp = live ? journeyProgress() : 0;
-    renderIntro(ip);
     if (live && y >= top - innerHeight && y <= top + h) renderJourney(jp);
     // kino ustida menyu qora, yorug' kiyim xonasi ustida — oddiy
     const inTry = live && J.film && J.tryAt != null && jp >= J.tryAt;
     const overJourney = live && !inTry && y >= top - 60 && y < top + h - 60;
     nav.classList.toggle('dark', !!overJourney);
-    nav.classList.toggle('solid', !overJourney && y > introEnd + innerHeight * 0.6);
+    nav.classList.toggle('solid', !overJourney && y > innerHeight * 0.6);
   }
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
-  addEventListener('resize', () => { placePins(); sizeJourneyMap(); sizeJourney(); render(); });
+  addEventListener('resize', () => { sizeJourney(); render(); });
 
-  // Ishga tushirish: intro videosi darhol ulanadi va brauzer uni o'zi yuklab boradi (preload="auto") — butun fayl
-  // kelishini kutmasdan skroll bilan suriladi. Filial (#andijon) ham darhol ochiladi.
-  (async () => {
-    const hash = location.hash.slice(1);
-    const ok = new Promise(res => {
-      introVideo.addEventListener('loadeddata', () => res(true), { once: true });
-      introVideo.addEventListener('error', () => res(false), { once: true });
-    });
-    introVideo.src = 'assets/video/intro.mp4';
-    if (STORES[hash]) enter(hash);
-    render();
-    if (!(await ok)) { drawIntro(); return; }
-    INTRO_VIDEO = introVideo;
-    introScrub.jump();
-    introVideo.addEventListener('seeked', introScrub.run);
-    introScrub.run();
-  })();
+  // Ishga tushirish: havolada filial bo'lsa (#andijon) — darhol o'sha do'kon
+  const hash = location.hash.slice(1);
+  if (STORES[hash]) enter(hash);
+  render();
 })();
