@@ -17,7 +17,6 @@
   const tel = s => 'tel:' + s.replace(/[^\d+]/g, '');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // card — bosh sahifa kartasi (Higgsfield yasagan shahar ko'rinishi); kinosiz filialda safar ham shundan boshlanadi.
   // thumb — aloqa bo'limidagi kichik rasm; door — eshik (rasmlar shu nuqtaga yaqinlashadi).
   const STORES = {
     shahrixon: {
@@ -26,7 +25,7 @@
       phones: ['+998 93 372 88 55'], hours: null,
       insta: 'legenda_shahrixon', tg: 'https://t.me/Legenda_Premium1',
       day: 'assets/filial/shahrixon_kun.jpg', night: null, inside: 'assets/filial/shahrixon_ichkari.jpg',
-      thumb: 'assets/filial/shahrixon_kun_kichik.jpg', card: 'assets/filial/shahrixon_karta.jpg', door: [50, 58],
+      thumb: 'assets/filial/shahrixon_kun_kichik.jpg', door: [50, 58],
     },
     asaka: {
       city: 'Asaka', title: 'Legenda Premium',
@@ -35,7 +34,7 @@
       insta: 'legenda_premium_asaka', tg: null,
       // Asakadan faqat kechki vitrina rasmi bor — kunduzgi ko'rinish shu rasmdan filtr bilan olinadi
       day: 'assets/filial/asaka_tun.jpg', dayify: true, night: null, inside: 'assets/filial/asaka_ichkari.jpg',
-      thumb: 'assets/filial/asaka_resepshn_kichik.jpg', card: 'assets/filial/asaka_karta.jpg', door: [48, 52],
+      thumb: 'assets/filial/asaka_resepshn_kichik.jpg', door: [48, 52],
     },
     andijon: {
       city: 'Andijon', title: 'Legenda Andijon',
@@ -43,23 +42,18 @@
       phones: ['+998 88 480 71 71', '+998 93 100 78 13'], hours: 'har kuni 08:00 – 02:00',
       insta: 'legenda_andijon', tg: 'https://t.me/LEGENDA_AND1',
       day: 'assets/filial/andijon_kun.jpg', night: 'assets/filial/andijon_tun.jpg', inside: 'assets/filial/andijon_ichkari.jpg',
-      thumb: 'assets/filial/andijon_tun_kichik.jpg', card: 'assets/filial/andijon_karta.jpg', door: [50, 60],
+      thumb: 'assets/filial/andijon_tun_kichik.jpg', door: [50, 60],
     },
   };
   const ORDER = ['shahrixon', 'asaka', 'andijon']; // chapdan o'ngga (g'arbdan sharqqa)
   const CAT = { "Ko'ylak": "Ko'ylak", 'Oyoq kiyim': 'Oyoq kiyim', Komplekt: 'Tayyor look', Kurtka: 'Kurtka', Kostyum: 'Kostyum', Kardigan: 'Kardigan', Jilet: 'Jilet' };
   const PRODUCTS = window.LEGENDA_PRODUCTS || [];
 
-  /* ---------- BOSH SAHIFA: 3 ta filial ---------- */
-  // Uchta shahar kartasi; bosilsa — o'sha do'konga safar (Andijon: do'kon tepasidagi dron kadridan)
-  $('#cities').innerHTML = ORDER.map(key => {
-    const st = STORES[key];
-    return `<button class="city" type="button" data-key="${key}" aria-label="${esc(st.city)} filialiga kirish">
-      <img src="${st.card}" alt="" decoding="async">
-      <span class="t"><span class="kicker">${esc(st.title)}</span><span class="name">${esc(st.city)}</span>
-        <span class="addr">${esc(st.street)}</span><span class="go">Do’konga kirish <i>→</i></span></span></button>`;
-  }).join('');
-  $('#cities').addEventListener('click', e => { const b = e.target.closest('[data-key]'); if (b) enter(b.dataset.key); });
+  /* ---------- FILIAL ALMASHTIRGICH (kino ustida, chap tepada) ---------- */
+  // Sayt darhol Andijon kinosi bilan ochiladi; boshqa filialga shu yerdan (yoki "Aloqa" dagi kartalardan) o'tiladi.
+  const switchEl = $('#switch');
+  switchEl.innerHTML = ORDER.map(key => `<button type="button" data-key="${key}">${esc(STORES[key].city)}</button>`).join('');
+  switchEl.addEventListener('click', e => { const b = e.target.closest('[data-key]'); if (b && !(J && J.key === b.dataset.key)) enter(b.dataset.key); });
 
   // Video skrolldan biroz orqada "suzib" boradi — g'ildirak qadamlari sakramasin.
   // Keyingi seek oldingisi tugagach ('seeked') beriladi: dekoder qancha tez bo'lsa, shuncha tez,
@@ -99,9 +93,10 @@
   async function buildJourney(key) {
     const st = STORES[key];
     layersEl.innerHTML = ''; capEl.innerHTML = ''; stage.classList.remove('film');
-    // bosh sahifadagi shahar kartasidan boshlaymiz (kino yuklanguncha ham shu ko'rinadi).
-    // Filial rasmlari faqat kinosiz animatsiya uchun — kino (FILMS) bo'lsa ular yuklanmaydi.
-    const L = { map: layer(`<img src="${st.card}" alt="">`), day: null, night: null, inside: null };
+    // kino (FILMS) bo'lsa — video kelguncha uning birinchi kadri (rasm) ko'rinadi, filial rasmlari yuklanmaydi;
+    // kinosiz filial safari to'g'ri filial rasmidan boshlanadi
+    const L = { map: FILMS[key] ? layer(`<img src="assets/video/${key}_boshi.jpg" alt="">`) : null, day: null, night: null, inside: null };
+    if (L.map) L.map.style.opacity = 1;
     const photos = () => {
       L.day = layer(`<img src="${st.day}" alt="">`);
       L.night = st.night ? layer(`<img src="${st.night}" alt="">`) : null;
@@ -130,6 +125,7 @@
     J = { key, st, L, caps, film: null, cur: -1, look: -1, blobs: [], phases: [0, .24, .45, .72, 1] };
     journey.style.height = '';
     stepsLi[4].hidden = true; // "Kiyimlar" — faqat kinoda kiyimlar bo'lsa
+    lookCard.classList.remove('show'); // oldingi filialning kiyim kartochkasi
 
     // Higgsfield kliplari bo'lsa — kadrlar o'rniga kino. Tahrir (FILMS) bo'lmasa yoki uning fayllaridan biri
     // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D). Avval faqat videolarning boshi (metadata,
@@ -152,8 +148,8 @@
       const v = x.c || x.vid ? media[k] : null, el = layer('');
       el.appendChild(media[k]);
       if (x.look != null) el.classList.add('try');
-      const to = v ? v.duration - 0.05 : 0;
-      const it = { c: x.c, look: x.look, el, v, from: 0, to, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
+      const to = v ? v.duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
+      const it = { c: x.c, look: x.look, el, v, from: 0, to, keys, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
       if (v) v.addEventListener('seeked', journeyScrub.run);
       at += it.w;
       return it;
@@ -174,16 +170,25 @@
   // Kino tahriri: Higgsfield kliplarining xira yoki sifatsiz joylari fayldan kesilgan (skript: TRIM, SKIP).
   // c — do'kon klipi harfi; vid/img — assets/ ichidagi video yoki rasm; w — necha "soniya" turadi (video uchun
   // berilmasa — uzunligi); fade — oldingi kadrdan shuncha soniyada erib o'tish; push — rasm sekin yaqinlashishi;
-  // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi.
+  // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi;
+  // keys — [skroll ulushi, video soniyasi] nuqtalari: xira joy skrollda tez o'tib ketadi, tiniq joy uzoqroq turadi.
   const FILMS = {
     // do'kon tepasidagi dron kadridan (B, 1 s — sekinroq suriladi) boshlanadi; eshikdan kirgach — kiyimlar:
     // har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
-    andijon: [{ c: 'B', w: 2.5 }, { c: 'C' }, { c: 'D' }, { c: 'E' },
+    // C da 2.2–3.5 s — kamera tomlar ustidan o'tadi, chetlarda xira narsalar: skrollning 8% ida o'tadi
+    andijon: [{ c: 'B', w: 2.5 }, { c: 'C', keys: [[0, 0], [0.42, 2.2], [0.5, 3.5], [1, 5]] }, { c: 'D' }, { c: 'E' },
       { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', w: 8, fade: 1, look: 0 },
       { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', w: 8, fade: 1, look: 1 },
       { img: 'kiyim/ilgich_LG-013', w: 1.8, fade: 1, push: 0.03, look: 2 }, { img: 'kiyim/orta_LG-013', w: 3, fade: 1, push: 0.03, look: 2 }],
   };
   const LOOKS = ['LG-014', 'LG-018', 'LG-013'];
+  // keys bo'yicha: skroll ulushi t → video soniyasi
+  const warp = (keys, t) => {
+    let k = 1;
+    while (k < keys.length - 1 && t > keys[k][0]) k++;
+    const [a, sa] = keys[k - 1], [b, sb] = keys[k];
+    return sa + (sb - sa) * clamp((t - a) / (b - a));
+  };
   const hasTry = key => !!(FILMS[key] && FILMS[key].some(x => x.look != null));
   const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
   // video elementi faqat metadata bilan (uzunligi ma'lum bo'ladi), 10 s ichida kelmasa — null
@@ -236,7 +241,7 @@
       while (i < F.length - 1 && pos >= F[i + 1].at) i++;
       const it = F[i];
       J.local = clamp((pos - it.at) / it.w);
-      const moved = !!it.v && seekTo(it.v, it.from + J.local * (it.to - it.from));
+      const moved = !!it.v && seekTo(it.v, it.keys ? warp(it.keys, J.local) : it.from + J.local * (it.to - it.from));
       if (i !== J.cur) {
         J.cur = i; J.ready = !moved;
         if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
@@ -285,12 +290,10 @@
       [ovDay, ovNight, ovGlow, ovWarm].forEach(o => (o.style.opacity = 0));
     } else {
       const hasNight = !!L.night;
-      // A: shahar kartasidan do'kon tomon sho'ng'ish
-      const a = ease(ramp(p, 0, P[1]));
-      setLayer(L.map, 1 - ramp(p, P[1] - 0.07, P[1] + 0.02), lerp(1, 2.6, a), `blur(${(ramp(p, P[1] - 0.08, P[1]) * 8).toFixed(1)}px)`);
-      // B → C: kunduzgi fasad, keyin qorong'ilashadi
+      // kunduzgi fasad (boshidanoq ko'rinadi, sekin yaqinlashadi), keyin qorong'ilashadi.
+      // Kino rasmi (L.map) — kino yuklanguncha o'zgarmay turadi.
       const dusk = ramp(p, P[2], P[3] - 0.02);
-      const dayIn = ramp(p, P[1] - 0.08, P[1] + 0.02);
+      const dayIn = 1;
       const dayOut = hasNight ? 1 - ramp(p, P[3] - 0.1, P[3]) : 1 - ramp(p, 0.86, 0.93);
       const dayScale = p < P[2] ? lerp(1.35, 1.04, ease(ramp(p, P[1] - 0.08, P[2])))
         : lerp(1.04, hasNight ? 1.14 : 1.8, ease(ramp(p, P[2], hasNight ? P[3] : 0.92)));
@@ -425,15 +428,13 @@
     buildJourney(key);
     renderCatalog(key);
     journey.hidden = false; catalog.hidden = false; navCatalog.hidden = false;
-    navTry.hidden = !(FILMS[key] && FILMS[key].some(x => x.look != null));
+    navTry.hidden = !hasTry(key);
+    switchEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.key === key));
     history.replaceState(null, '', '#' + key);
-    requestAnimationFrame(() => {
-      render();
-      window.scrollTo({ top: journey.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
-    });
+    // kino boshiga darhol (silliq skroll butun kinoni orqaga aylantirib o'tardi)
+    window.scrollTo({ top: journey.offsetTop, behavior: 'auto' });
+    render();
   }
-  // "← Filiallar": bosh sahifadagi kartalarga
-  $('#back').addEventListener('click', () => window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
 
   let ticking = false;
   function render() {
@@ -451,8 +452,7 @@
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
   addEventListener('resize', () => { sizeJourney(); render(); });
 
-  // Ishga tushirish: havolada filial bo'lsa (#andijon) — darhol o'sha do'kon
+  // Ishga tushirish: havolada filial bo'lsa (#shahrixon) — o'sha, bo'lmasa Andijon kinosi
   const hash = location.hash.slice(1);
-  if (STORES[hash]) enter(hash);
-  render();
+  enter(STORES[hash] ? hash : 'andijon');
 })();

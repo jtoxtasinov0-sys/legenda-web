@@ -32,32 +32,6 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .nav nav a { color: inherit; text-decoration: none; font: 600 12px/1 var(--sans); letter-spacing: .16em; text-transform: uppercase; opacity: .9; }
 .nav nav a:hover { opacity: 1; text-decoration: underline; text-underline-offset: 6px; }
 
-/* ---------- BOSH SAHIFA: 3 ta filial ---------- */
-/* uchta shahar yonma-yon; kursor ostidagisi kengayadi. Telefonda — ustma-ust uchta tasma */
-.start { position: relative; height: 100vh; height: 100svh; min-height: 560px; overflow: hidden; background: #0d0b0a; color: #fff; }
-.start-head { position: absolute; z-index: 2; left: 0; right: 0; top: 0; padding: clamp(96px, 15vh, 150px) var(--gutter) 0; text-align: center; pointer-events: none; text-shadow: 0 2px 30px rgba(0, 0, 0, .5); }
-.start-head .kicker { color: var(--accent-soft); }
-.start-head h1 { margin: 14px 0 0; font: 400 clamp(38px, 5.4vw, 76px)/1 var(--serif); }
-.start-head em { color: var(--accent-soft); }
-.cities { position: absolute; inset: 0; display: flex; }
-.city { all: unset; position: relative; flex: 1 1 0; min-width: 0; overflow: hidden; cursor: pointer; transition: flex-grow .7s cubic-bezier(.2, .7, .2, 1); }
-.city + .city { border-left: 1px solid rgba(255, 255, 255, .16); }
-.city img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scale(1.04); filter: brightness(.8); transition: transform 1.2s cubic-bezier(.2, .7, .2, 1), filter .7s; }
-.city::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, rgba(10, 12, 16, .62), rgba(10, 12, 16, 0) 36%, rgba(10, 12, 16, 0) 50%, rgba(10, 12, 16, .8)); }
-.city .t { position: absolute; z-index: 1; left: clamp(20px, 3vw, 44px); right: 20px; bottom: clamp(36px, 8vh, 80px); display: grid; justify-items: start; gap: 8px; }
-.city .kicker { color: var(--accent-soft); font-size: 11px; }
-.city .name { font: 400 clamp(40px, 4.6vw, 72px)/1 var(--serif); }
-.city .addr { font: 500 14px/1.4 var(--sans); opacity: .85; }
-.city .go { margin-top: 10px; padding: 11px 18px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .6); font: 600 12px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; transition: background .4s, color .4s, border-color .4s; }
-.city .go i { display: inline-block; font-style: normal; transition: translate .4s; }
-.city:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: -6px; }
-@media (hover: hover) {
-  .city:hover { flex-grow: 1.7; }
-  .city:hover img { transform: scale(1.1); filter: brightness(.95); }
-  .city:hover .go { background: var(--bg); color: var(--ink); border-color: var(--bg); }
-  .city:hover .go i { translate: 4px 0; }
-}
-
 /* ---------- JOURNEY ---------- */
 .journey { position: relative; height: 520vh; background: #0d0b0a; }
 .journey[hidden] { display: none; }
@@ -94,8 +68,12 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .steps li.on { opacity: 1; }
 .steps li:not(:first-child) { text-align: center; }
 .steps li:last-child, .steps li:nth-child(4):has(+ li[hidden]) { text-align: right; }
-.back { position: absolute; z-index: 6; left: var(--gutter); top: 84px; padding: 10px 16px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .5); background: rgba(0, 0, 0, .28); color: #fff; font: 600 12px/1 var(--sans); letter-spacing: .1em; cursor: pointer; backdrop-filter: blur(8px); }
-.back:hover { background: rgba(0, 0, 0, .45); }
+/* filial almashtirgich: kino ustida chap tepada */
+.switch { position: absolute; z-index: 6; left: var(--gutter); top: 84px; display: flex; gap: 2px; padding: 4px; border-radius: 999px; border: 1px solid rgba(255, 255, 255, .4); background: rgba(10, 8, 6, .42); }
+.switch button { all: unset; cursor: pointer; padding: 8px 14px; border-radius: 999px; color: #fff; font: 600 12px/1 var(--sans); letter-spacing: .08em; transition: background .3s, color .3s; }
+.switch button:hover { background: rgba(255, 255, 255, .16); }
+.switch button.on { background: #fff; color: var(--ink); }
+.switch button:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
 
 /* ---------- KIYIMLAR (kino ichida) ---------- */
 /* kiyim va model kadrning chap-o'rtasida — tor ekranda ham ko'rinib tursin */
@@ -105,7 +83,9 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .stage.light .steps { color: var(--ink); }
 .stage.light .track { background: rgba(24, 20, 17, .15); }
 .stage.light .track b { background: var(--accent); }
-.stage.light .back { color: var(--ink); border-color: rgba(24, 20, 17, .2); background: rgba(255, 252, 247, .6); }
+.stage.light .switch { border-color: rgba(24, 20, 17, .18); background: rgba(255, 252, 247, .7); }
+.stage.light .switch button { color: var(--ink); }
+.stage.light .switch button.on { background: var(--ink); color: var(--bg); }
 .look-card { position: absolute; z-index: 6; right: var(--gutter); top: 50%; translate: 0 -50%; width: min(370px, 31vw); max-height: calc(100% - 190px); margin-top: 10px; overflow-y: auto; scrollbar-width: none; display: grid; gap: 14px; padding: 22px 22px 16px; border-radius: 26px; background: rgba(255, 252, 247, .96); border: 1px solid rgba(255, 255, 255, .7); box-shadow: 0 30px 80px rgba(70, 45, 20, .18); color: var(--ink); opacity: 0; transform: translateX(24px); pointer-events: none; transition: opacity .5s, transform .5s; }
 .look-card.show { opacity: 1; transform: none; pointer-events: auto; }
 .look-card::-webkit-scrollbar { display: none; }
@@ -181,19 +161,6 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .foot { display: flex; justify-content: space-between; gap: 16px; padding: 22px var(--gutter); background: #120f0d; color: #8d8073; font: 600 11px/1 var(--sans); letter-spacing: .2em; text-transform: uppercase; }
 
 /* ---------- TELEFON / TOR EKRAN ---------- */
-/* bosh sahifa: sarlavha tepada, uchta shahar ustma-ust tasma bo'lib */
-@media (max-aspect-ratio: 4 / 5), (max-width: 640px) {
-  .start { display: flex; flex-direction: column; }
-  .start-head { position: relative; padding: 92px 16px 20px; }
-  .start-head h1 { font-size: clamp(30px, 8.6vw, 44px); }
-  .cities { position: relative; flex: 1; flex-direction: column; }
-  .city + .city { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .16); }
-  .city::after { background: linear-gradient(180deg, rgba(10, 12, 16, .1), rgba(10, 12, 16, .7)); }
-  .city .t { left: 18px; right: 18px; bottom: 16px; gap: 4px; }
-  .city .name { font-size: 34px; }
-  .city .addr { display: none; }
-  .city .go { position: absolute; right: 0; bottom: 0; margin: 0; padding: 9px 14px; font-size: 11px; }
-}
 /* telefonda kartochka pastda, ixcham: tarkibi va razmerlari katalogda */
 @media (max-width: 760px), (max-aspect-ratio: 4 / 5) {
   .look-card { top: auto; bottom: 86px; right: 12px; left: 12px; translate: none; width: auto; max-height: 46%; margin: 0; padding: 16px 16px 12px; gap: 10px; transform: translateY(24px); }
@@ -205,12 +172,13 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
   .nav nav #navTry { display: none; }
   .nav { padding: 14px 16px; }
   .nav nav { gap: 16px; }
-  .nav nav a[href="#top"] { display: none; }
+  .nav nav #navBranches { display: none; } /* telefonda filiallar — kino ustidagi almashtirgichda */
   .brand { letter-spacing: .3em; font-size: 13px; }
   .cap { bottom: 110px; }
   .steps ol { font-size: 9px; letter-spacing: .14em; }
-  .back { top: 70px; }
-  .hint { bottom: 104px; }
+  .switch { top: 66px; left: 12px; }
+  .switch button { padding: 7px 11px; font-size: 11px; }
+  .hint { bottom: 104px; left: auto; right: 16px; translate: none; } /* yozuv (chapda) bilan ustma-ust tushmasin */
   .cat-meta { justify-items: start; text-align: left; }
   .cat-meta .links { justify-content: flex-start; }
   .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
@@ -223,5 +191,5 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .hint i { animation: none; }
-  .card, .ph img, .city, .city img { transition: none; }
+  .card, .ph img { transition: none; }
 }
