@@ -153,8 +153,10 @@
       const v = x.c || x.vid ? media[k] : null, el = layer('');
       el.appendChild(media[k]);
       if (x.look != null) el.classList.add('try');
+      // aylanish videosi ustida uning Start = End kadri (2K rasm): model yuzi bilan turganda tiniq rasm ko'rinadi
+      const still = x.still ? el.appendChild(Object.assign(new Image(), { className: 'still', alt: '', src: `assets/${x.still}${M}.jpg` })) : null;
       const to = v ? v.duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
-      const it = { c: x.c, look: x.look, el, v, from: 0, to, keys, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
+      const it = { c: x.c, look: x.look, el, v, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
       if (v) v.addEventListener('seeked', journeyScrub.run);
       at += it.w;
       return it;
@@ -178,14 +180,16 @@
   // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi;
   // keys — [skroll ulushi, video soniyasi] nuqtalari: xira joy skrollda tez o'tib ketadi, tiniq joy uzoqroq turadi.
   // model videosi: ilgichdan erib o'tayotganda (fade 1 / w 8) yuzi bilan turadi, keyin skroll bilan bir aylanadi
-  const TURN = [[0, 0], [0.125, 0], [1, 5]];
+  // va oxirida yana biroz yuzi bilan turadi. Turgan paytda video ustida tiniq rasm (still) — Higgsfield videosi
+  // aylanish paytida xiraroq, rasm esa 2K.
+  const TURN = [[0, 0], [0.125, 0], [0.94, 5], [1, 5]];
   const FILMS = {
     // do'kon tepasidagi dron kadridan (B, 1 s — sekinroq suriladi) boshlanadi; eshikdan kirgach — kiyimlar:
     // har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
     // C da 2.2–3.5 s — kamera tomlar ustidan o'tadi, chetlarda xira narsalar: skrollning 8% ida o'tadi
     andijon: [{ c: 'B', w: 2.5 }, { c: 'C', keys: [[0, 0], [0.42, 2.2], [0.5, 3.5], [1, 5]] }, { c: 'D' }, { c: 'E' },
-      { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', w: 8, fade: 1, keys: TURN, look: 0 },
-      { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', w: 8, fade: 1, keys: TURN, look: 1 },
+      { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', still: 'kiyim/orta_LG-014', w: 8, fade: 1, keys: TURN, look: 0 },
+      { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', still: 'kiyim/orta_LG-018', w: 8, fade: 1, keys: TURN, look: 1 },
       { img: 'kiyim/ilgich_LG-013', w: 1.8, fade: 1, push: 0.03, look: 2 }, { img: 'kiyim/orta_LG-013', w: 3, fade: 1, push: 0.03, look: 2 }],
   };
   const LOOKS = ['LG-014', 'LG-018', 'LG-013'];
@@ -196,6 +200,8 @@
     const [a, sa] = keys[k - 1], [b, sb] = keys[k];
     return sa + (sb - sa) * clamp((t - a) / (b - a));
   };
+  // bo'lak ichidagi o'rin (0–1) → video soniyasi
+  const clipTime = (it, local) => it.keys ? warp(it.keys, local) : it.from + local * (it.to - it.from);
   const hasTry = key => !!(FILMS[key] && FILMS[key].some(x => x.look != null));
   const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
   // video elementi faqat metadata bilan (uzunligi ma'lum bo'ladi), 10 s ichida kelmasa — null
@@ -249,7 +255,7 @@
       while (i < F.length - 1 && pos >= F[i + 1].at) i++;
       const it = F[i];
       J.local = clamp((pos - it.at) / it.w);
-      const moved = !!it.v && seekTo(it.v, it.keys ? warp(it.keys, J.local) : it.from + J.local * (it.to - it.from));
+      const moved = !!it.v && seekTo(it.v, clipTime(it, J.local));
       if (i !== J.cur) {
         J.cur = i; J.ready = !moved;
         if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
@@ -271,6 +277,12 @@
       x.el.style.visibility = k >= i - 1 && k <= i + 1 ? 'visible' : 'hidden';
       const push = x.v ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
       x.el.style.transform = `scale(${(push * (out ? lerp(1, 1.06, f) : 1)).toFixed(4)})`;
+      // tiniq rasm faqat model deyarli qimirlamaganda (birinchi ~0.2 s va oxirgi ~0.25 s) — keyin video
+      if (x.still) {
+        const t = k === i ? clipTime(x, J.local) : k < i ? x.to : x.from;
+        const s = x.still.naturalWidth ? Math.max(1 - ramp(t, 0.03, 0.2), ramp(t, x.to - 0.25, x.to - 0.04)) : 0;
+        x.still.style.opacity = s.toFixed(3);
+      }
     });
     if (J.poster) { const p = J.poster; J.poster = null; requestAnimationFrame(() => requestAnimationFrame(() => p.remove())); }
     if (J.waitFor && J.waitFor.k === i) { J.waitFor.done(); J.waitFor = null; }
