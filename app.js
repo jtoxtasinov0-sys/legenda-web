@@ -61,17 +61,17 @@
   // Video skrolldan biroz orqada "suzib" boradi — g'ildirak qadamlari sakramasin.
   // Keyingi seek oldingisi tugagach ('seeked') beriladi: dekoder qancha tez bo'lsa, shuncha tez,
   // navbat ham tiqilmaydi. busy() — video hali surilyaptimi; seek(t) — t (0–1) holatga suradi,
-  // seek berilgan bo'lsa true qaytaradi.
+  // seek berilgan bo'lsa true qaytaradi. Kutish ekran kadri bilan (requestAnimationFrame) — oraliq chizishlar yo'q.
   function scrubber(busy, seek) {
     const s = { t: 0, target: 0, last: 0, wait: 0 };
     s.run = () => {
-      clearTimeout(s.wait);
+      cancelAnimationFrame(s.wait);
       if (busy()) return;
       const now = performance.now(), dt = Math.min(0.1, (now - s.last) / 1000);
       s.last = now;
       s.t += (s.target - s.t) * (1 - Math.exp(-dt / 0.12));
       if (Math.abs(s.target - s.t) < 0.0004) s.t = s.target;
-      if (!seek(s.t) && s.t !== s.target) s.wait = setTimeout(s.run, 16);
+      if (!seek(s.t) && s.t !== s.target) s.wait = requestAnimationFrame(s.run);
     };
     // ochilganda boshidan "suzib" kelmasin — darhol skroll turgan kadr
     s.jump = () => { s.t = s.target; s.last = performance.now(); };
@@ -125,6 +125,7 @@
       return el;
     });
     (J && J.blobs || []).forEach(u => URL.revokeObjectURL(u));
+    (J && J.film || []).forEach(it => it.q && it.q.bm.forEach(drop));
     J = { key, st, L, caps, film: null, cur: -1, look: -1, blobs: [], phases: [0, .24, .45, .72, 1] };
     journey.style.height = '';
     stepsLi[4].hidden = true; // "Kiyimlar" — faqat kinoda kiyimlar bo'lsa
@@ -222,31 +223,112 @@
   // Telefonda kino videosi o'rniga kadrlar: har klipning har kadri alohida WebP (assets/kadr/{klip}/001.webp ...),
   // canvas'ga chiziladi. iPhone (Safari, Telegram ichidagi brauzer) va quvvat tejash rejimida video skroll bilan
   // surilmaydi yoki umuman yuklanmaydi — rasm esa hamma joyda bir xil ishlaydi. Ro'yxat: kadrlar.json (skript).
+  //
+  // Tezlik: kadrni ochish (WebP dekodlash) qimmat — asosiy oqimda telefonda 30–80 ms, skroll qotadi. Shuning uchun
+  // fayllar avval xotiraga (blob) olinadi, keyin joriy joy atrofidagi kadrlar FONDA ochiladi (createImageBitmap,
+  // bir vaqtda 2 ta), skroll paytida esa faqat tayyor kadr chiziladi (~0.5 ms). Ochilgan kadr ~3 MB — xotirada
+  // ko'pi bilan FRAME_CACHE tasi turadi: joriy joydan oldinda ~18, orqada ~6 va qo'shni bo'laklar chegarasi.
   const KADR = PHONE ? fetch('assets/kadr/kadrlar.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
   const frameUrl = (name, k) => `assets/kadr/${name}/${String(k + 1).padStart(3, '0')}.webp`;
+  const FRAME_CACHE = 32, AHEAD = 18, BEHIND = 6;
+  const getBlob = u => fetch(u).then(r => (r.ok ? r.blob() : null)).catch(() => null);
+  // fonda ochish; createImageBitmap yo'q eski brauzerda — Image + decode()
+  const decodeBlob = b => window.createImageBitmap ? createImageBitmap(b) : new Promise((res, rej) => {
+    const im = new Image(), u = URL.createObjectURL(b);
+    im.onload = () => (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { URL.revokeObjectURL(u); res(im); });
+    im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('kadr')); };
+    im.src = u;
+  });
+  const drop = bm => bm && bm.close && bm.close();
   // birinchi va oxirgi kadr darhol (bo'laklar chegarasi shular), qolganlari keyin navbat bilan (loadFrames)
   async function frameSeq(name, m) {
-    const ends = await Promise.all([0, m.n - 1].map(k => loadImg(frameUrl(name, k))));
+    const ends = await Promise.all([0, m.n - 1].map(k => getBlob(frameUrl(name, k))));
     if (ends.includes(null)) return null;
+    const bms = await Promise.all(ends.map(b => decodeBlob(b).catch(() => null)));
+    if (bms.includes(null)) { bms.forEach(drop); return null; }
     const canvas = Object.assign(document.createElement('canvas'), { width: m.w, height: m.h });
-    const q = { name, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps, img: [], shown: -1, want: 0 };
-    q.img[0] = ends[0]; q.img[m.n - 1] = ends[1];
+    const q = { name, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps,
+      blob: [], bm: [], busy: new Set(), shown: -1, want: 0, dir: 1 };
+    q.blob[0] = ends[0]; q.blob[m.n - 1] = ends[1];
+    q.bm[0] = bms[0]; q.bm[m.n - 1] = bms[1];
     drawFrame(q, 0);
     return q;
   }
-  // t (soniya) dagi kadr; u hali yuklanmagan bo'lsa — eng yaqin yuklangani
+  // t (soniya) dagi kadr (t berilmasa — oxirgi so'ralgani); u hali ochilmagan bo'lsa — eng yaqin ochilgani
+  // (avval orqadagi, ya'ni o'tib kelingan tomondagi), kerakli kadr esa navbatga qo'yiladi
   function drawFrame(q, t) {
-    const want = clamp(Math.round(t * q.fps), 0, q.n - 1);
-    let k = -1;
-    for (let d = 0; k < 0 && d < q.n; d++) k = q.img[want - d] ? want - d : q.img[want + d] ? want + d : -1;
+    const want = t == null ? q.want : clamp(Math.round(t * q.fps), 0, q.n - 1);
+    if (want !== q.want) q.dir = want > q.want ? 1 : -1;
     q.want = want;
-    if (k >= 0 && k !== q.shown) { q.ctx.drawImage(q.img[k], 0, 0, q.canvas.width, q.canvas.height); q.shown = k; }
+    let k = -1;
+    for (let d = 0; k < 0 && d < q.n; d++) {
+      const a = want - d * q.dir, b = want + d * q.dir;
+      k = q.bm[a] ? a : q.bm[b] ? b : -1;
+    }
+    if (k >= 0 && k !== q.shown) { q.ctx.drawImage(q.bm[k], 0, 0, q.canvas.width, q.canvas.height); q.shown = k; }
+    if (k !== want) pumpDecode();
   }
-  // Kadrlar yuklanishi: avval butun kino bo'ylab har 8-kadr (kino darhol oxirigacha suriladi), keyin joriy
+  // Keyingi ochiladigan kadr: joriy bo'lakda kerakli kadrdan harakat tomoniga (bo'lak tugasa — keyingisiga
+  // o'tib), biroz orqaga, qo'shni bo'laklarning chegara kadrlari.
+  function nextDecode(j) {
+    const F = j.film, cur = F[Math.max(0, j.cur)], list = [];
+    const add = (it, k) => { if (it && it.q && k >= 0 && k < it.q.n) list.push([it.q, k]); };
+    if (cur && cur.q) {
+      const q = cur.q, i = F.indexOf(cur), step = (from, d, n) => {
+        for (let s = from; s <= n; s++) {
+          const k = q.want + s * d;
+          if (k >= 0 && k < q.n) add(cur, k);
+          else { const nb = F[i + d]; add(nb, d > 0 ? k - q.n : nb && nb.q ? nb.q.n + k : -1); }
+        }
+      };
+      step(0, q.dir, 5); step(1, -q.dir, 2);
+      add(F[i - 1], F[i - 1] && F[i - 1].q ? F[i - 1].q.n - 1 : -1); add(F[i + 1], 0);
+      step(6, q.dir, AHEAD); step(3, -q.dir, BEHIND);
+    } else if (cur) {
+      const i = F.indexOf(cur);
+      add(F[i - 1], F[i - 1] && F[i - 1].q ? F[i - 1].q.n - 1 : -1); add(F[i + 1], 0);
+      for (let k = 1; k < AHEAD; k++) add(F[i + 1], k);
+    }
+    return list.find(([q, k]) => q.blob[k] && !q.bm[k] && !q.busy.has(k));
+  }
+  // Xotira chegarasi: kerakli joydan eng uzoq (orqadagilar ikki barobar "uzoqroq") va qo'shni bo'lmagan
+  // bo'laklarning kadrlari yopiladi. Ko'rinib turgan kadr yopilmaydi.
+  function evict(j) {
+    const all = [], c = Math.max(0, j.cur);
+    j.film.forEach((it, f) => it.q && it.q.bm.forEach((bm, k) => bm && all.push([it.q, k, f])));
+    if (all.length <= FRAME_CACHE) return;
+    const cost = ([q, k, f]) => {
+      if (k === q.shown) return -1;
+      const d = (k - q.want) * q.dir, far = d < 0 ? -2 * d : d;
+      return f === c ? far : Math.abs(f - c) === 1 ? (k === q.want ? 0 : 40 + far) : 1000 + far;
+    };
+    all.sort((a, b) => cost(b) - cost(a));
+    all.slice(0, all.length - FRAME_CACHE).forEach(([q, k]) => { if (k !== q.shown) { drop(q.bm[k]); delete q.bm[k]; } });
+  }
+  let decoding = 0;
+  function pumpDecode() {
+    const j = J;
+    while (j && j.film && decoding < 2) {
+      const job = nextDecode(j);
+      if (!job) return;
+      const [q, k] = job;
+      q.busy.add(k); decoding++;
+      decodeBlob(q.blob[k]).then(bm => {
+        q.busy.delete(k); decoding--;
+        if (J !== j) { drop(bm); return; }
+        q.bm[k] = bm;
+        evict(j);
+        // kerakli kadrga ko'rinib turganidan yaqinroq kadr ochildi — qayta chizilsin
+        if (Math.abs(k - q.want) < Math.abs(q.shown - q.want)) drawFrame(q);
+        pumpDecode();
+      }, () => { q.busy.delete(k); decoding--; delete q.blob[k]; pumpDecode(); });
+    }
+  }
+  // Kadr fayllari yuklanishi: avval butun kino bo'ylab har 8-kadr (kino darhol oxirigacha suriladi), keyin joriy
   // bo'lakdan oldinga qarab qolganlari (har 4-, har 2-, hammasi) — skroll qilinayotgan joy birinchi silliqlashadi.
   function loadFrames(j) {
     const seqs = j.film.filter(it => it.q), lvl = k => (k % 8 ? k % 4 ? k % 2 ? 3 : 2 : 1 : 0);
-    seqs.forEach(it => { it.todo = [...Array(it.q.n).keys()].filter(k => !it.q.img[k]).sort((a, b) => lvl(a) - lvl(b) || a - b); });
+    seqs.forEach(it => { it.todo = [...Array(it.q.n).keys()].filter(k => !it.q.blob[k]).sort((a, b) => lvl(a) - lvl(b) || a - b); });
     const rank = it => { const f = j.film.indexOf(it), c = Math.max(0, j.cur); return f >= c ? f - c : 100 + c - f; };
     const pick = () => {
       const order = seqs.filter(it => it.todo.length).sort((a, b) => rank(a) - rank(b));
@@ -255,12 +337,9 @@
     };
     const worker = async () => {
       for (let p; J === j && (p = pick());) {
-        const [it, k] = p, im = await loadImg(frameUrl(it.q.name, k));
+        const [it, k] = p, b = await getBlob(frameUrl(it.q.name, k));
         if (J !== j) return;
-        if (!im) continue;
-        it.q.img[k] = im;
-        // kerakli kadrga ko'rinib turganidan yaqinroq kadr keldi — qayta chizilsin
-        if (j.film[j.cur] === it && Math.abs(k - it.q.want) < Math.abs(it.q.shown - it.q.want)) journeyScrub.run();
+        if (b) { it.q.blob[k] = b; pumpDecode(); }
       }
     };
     for (let w = 0; w < 6; w++) worker();
@@ -408,7 +487,7 @@
     let seg = 0;
     while (seg < stepsLi.length - 1 && P[seg + 1] < 1 && p >= P[seg + 1]) seg++;
     stepsLi.forEach((li, i) => li.classList.toggle('on', i === seg));
-    trackFill.style.width = (p * 100).toFixed(2) + '%';
+    trackFill.style.transform = `scaleX(${p.toFixed(4)})`; // width emas — har kadrda sahifa qayta o'lchanmasin
     hint.style.opacity = 1 - ramp(p, 0.01, 0.05);
     // kiyim xonasi yorug' — pastki yozuvlar qora, chetdagi qoraytirish yo'q
     stage.classList.toggle('light', J.tryAt != null && p >= J.tryAt);
