@@ -41,7 +41,7 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .stage { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; background: #0d0b0a; }
 .layers, .layer { position: absolute; inset: 0; }
 .layer { will-change: transform, opacity; opacity: 0; }
-.layer img, .layer video, .layer svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.layer img, .layer video, .layer canvas, .layer svg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
 .ov { position: absolute; inset: 0; pointer-events: none; opacity: 0; }
 /* kinoda bu qoplamalar ishlatilmaydi — aralashtirish (blend) qatlamlari umuman chizilmasin */
 .stage.film .ov { display: none; }
@@ -80,9 +80,9 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 
 /* ---------- KIYIMLAR (kino ichida) ---------- */
 /* kiyim va model kadrning chap-o'rtasida — tor ekranda ham ko'rinib tursin */
-.layer.try img, .layer.try video { object-position: 37% 50%; }
-/* telefon videosi (_m) va uning tiniq rasmi model atrofidan kesilgan — o'rtasi */
-.phone .layer.try video, .phone .layer.try img.still { object-position: 50% 50%; }
+.layer.try img, .layer.try video, .layer.try canvas { object-position: 37% 50%; }
+/* telefon videosi (_m) / kadrlari va uning tiniq rasmi model atrofidan kesilgan — o'rtasi */
+.phone .layer.try video, .phone .layer.try canvas, .phone .layer.try img.still { object-position: 50% 50%; }
 /* aylanish videosi ustidagi tiniq rasm (Start = End kadri) — shaffofligi skroll bilan o'zgaradi */
 .layer img.still { will-change: opacity; }
 /* kiyimlar orasida o'tish pardasi: video oraliq kadrlardan aylanib o'tmaydi */
