@@ -65,7 +65,7 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 
 .steps { position: absolute; z-index: 5; left: var(--gutter); right: var(--gutter); bottom: max(clamp(24px, 5vh, 44px), env(safe-area-inset-bottom)); color: #fff; }
 .track { height: 2px; background: rgba(255, 255, 255, .25); border-radius: 2px; overflow: hidden; }
-.track b { display: block; height: 100%; width: 0; background: var(--accent-soft); }
+.track b { display: block; height: 100%; width: 100%; transform: scaleX(0); transform-origin: 0 50%; background: var(--accent-soft); }
 .steps ol { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; font: 600 11px/1 var(--sans); letter-spacing: .22em; text-transform: uppercase; }
 .steps li { opacity: .45; transition: opacity .3s; }
 .steps li.on { opacity: 1; }
