@@ -81,8 +81,10 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 /* ---------- KIYIMLAR (kino ichida) ---------- */
 /* kiyim va model kadrning chap-o'rtasida — tor ekranda ham ko'rinib tursin */
 .layer.try img, .layer.try video { object-position: 37% 50%; }
-/* telefon videosi (_m) model atrofidan kesilgan — o'rtasi */
-.phone .layer.try video { object-position: 50% 50%; }
+/* telefon videosi (_m) va uning tiniq rasmi model atrofidan kesilgan — o'rtasi */
+.phone .layer.try video, .phone .layer.try img.still { object-position: 50% 50%; }
+/* aylanish videosi ustidagi tiniq rasm (Start = End kadri) — shaffofligi skroll bilan o'zgaradi */
+.layer img.still { will-change: opacity; }
 /* kiyimlar orasida o'tish pardasi: video oraliq kadrlardan aylanib o'tmaydi */
 .veil { position: absolute; inset: 0; z-index: 4; background: #ebe3d6; opacity: 0; pointer-events: none; transition: opacity .2s ease; }
 .veil.on { opacity: 1; }
