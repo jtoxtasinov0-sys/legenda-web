@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#f5f0e8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500&family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -20,34 +20,39 @@
   </a>
   <nav>
     <a href="#top">Filiallar</a>
+    <a href="#journey" id="navTry" hidden>Kiyib ko'rish</a>
     <a href="#katalog" id="navCatalog" hidden>Katalog</a>
     <a href="#aloqa">Aloqa</a>
   </nav>
 </header>
 
 <!-- 1. INTRO: bulutlardan vodiyga, 3 ta do'kon tanlovi -->
-<section class="intro" id="top" aria-label="Filialni tanlang">
-  <div class="valley" id="valley">
-    <div class="map" id="introMap"></div>
-    <video id="introVideo" muted playsinline preload="auto" hidden></video>
+<section class="intro vmode" id="top" aria-label="Filialni tanlang">
+  <!-- skroll introni suradi: bo'lim baland, sahna esa ekranga yopishib turadi -->
+  <div class="intro-stage">
+    <div class="valley" id="valley">
+      <div class="map" id="introMap" hidden></div>
+      <video id="introVideo" muted playsinline preload="auto" poster="assets/video/intro_start.jpg"></video>
+    </div>
+    <div class="sky" id="sky" hidden></div>
+    <div class="clouds" id="clouds" aria-hidden="true" hidden></div>
+    <div class="intro-title" id="introTitle">
+      <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
+      <h1>LEGENDA</h1>
+      <span class="script">3 shahar — bitta uslub</span>
+    </div>
+    <div class="choose" id="choose">
+      <span class="kicker">FARG'ONA VODIYSI</span>
+      <h2>Qaysi filialga <em>kiramiz?</em></h2>
+    </div>
+    <div class="pins" id="pins"></div>
+    <div class="pick" id="pick"></div>
+    <div class="hint" id="introHint"><span>Pastga suring</span><i></i></div>
+    <button class="skip" id="skip" type="button">O'tkazib yuborish</button>
   </div>
-  <div class="sky" id="sky"></div>
-  <div class="clouds" id="clouds" aria-hidden="true"></div>
-  <div class="intro-title" id="introTitle">
-    <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
-    <h1>LEGENDA</h1>
-    <span class="script">3 shahar — bitta uslub</span>
-  </div>
-  <div class="choose" id="choose">
-    <span class="kicker">FARG'ONA VODIYSI</span>
-    <h2>Qaysi filialga <em>kiramiz?</em></h2>
-  </div>
-  <div class="pins" id="pins"></div>
-  <div class="pick" id="pick"></div>
-  <button class="skip" id="skip" type="button">O'tkazib yuborish</button>
 </section>
 
-<!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi -->
+<!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi; eshikdan keyin — kiyimlar (model skroll bilan aylanadi) -->
 <section class="journey" id="journey" hidden aria-label="Do'konga kirish">
   <div class="stage" id="stage">
     <div class="layers" id="layers"></div>
@@ -60,8 +65,17 @@
     <div class="hint" id="hint"><span>Pastga suring</span><i></i></div>
     <div class="steps" id="steps">
       <div class="track"><b id="trackFill"></b></div>
-      <ol><li>Osmon</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li></ol>
+      <ol><li>Osmon</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li><li hidden>Kiyimlar</li></ol>
     </div>
+    <aside class="look-card" id="lookCard" aria-live="polite">
+      <div class="try-top"><span class="kicker">LEGENDA XONASI</span><span class="try-count" id="lookCount"></span></div>
+      <div class="look-info" id="lookInfo"></div>
+      <div class="try-nav">
+        <button type="button" class="arrow" id="lookPrev" aria-label="Oldingi kiyim">←</button>
+        <div class="thumbs" id="lookThumbs"></div>
+        <button type="button" class="arrow" id="lookNext" aria-label="Keyingi kiyim">→</button>
+      </div>
+    </aside>
     <button class="back" id="back" type="button">← Filiallar</button>
   </div>
 </section>

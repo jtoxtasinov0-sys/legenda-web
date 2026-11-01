@@ -3,3 +3,6 @@ _build.py
 kliplarni_joylash.py
 README.txt
 __pycache__/
+
+.vercel
+.env*

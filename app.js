@@ -17,32 +17,33 @@
   const tel = s => 'tel:' + s.replace(/[^\d+]/g, '');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Vodiy kadri 1600x900. pin — chizilgan xaritadagi joy; side — haqiqiy intro kadrida qaysi tomonga sho'ng'ish (% eni).
+  // Vodiy kadri 1600x900. pin — chizilgan xaritadagi joy; vpin — Higgsfield intro videosining oxirgi kadridagi shahar;
+  // side — o'sha kadrda qaysi tomonga sho'ng'ish (% eni).
   const STORES = {
     shahrixon: {
-      city: 'Shahrixon', title: 'Legenda Premium', pin: [330, 600], side: 28,
+      city: 'Shahrixon', title: 'Legenda Premium', pin: [330, 600], vpin: [200, 545], side: 12,
       street: "Hamza ko'chasi", address: "Shahrixon sh., Hamza ko'chasi", landmark: "2-maktab oldida",
       phones: ['+998 93 372 88 55'], hours: null,
       insta: 'legenda_shahrixon', tg: 'https://t.me/Legenda_Premium1',
       day: 'assets/filial/shahrixon_kun.jpg', night: null, inside: 'assets/filial/shahrixon_ichkari.jpg',
-      thumb: 'assets/filial/shahrixon_kun.jpg', door: [50, 58],
+      thumb: 'assets/filial/shahrixon_kun_kichik.jpg', door: [50, 58],
     },
     asaka: {
-      city: 'Asaka', title: 'Legenda Premium', pin: [800, 680], side: 50,
+      city: 'Asaka', title: 'Legenda Premium', pin: [800, 680], vpin: [800, 600], side: 50,
       street: "Sharq to'yxonasi, 1-qavat", address: "Asaka sh., Imom Buxoriy ko'chasi", landmark: "Sharq to'yxonasi, 1-qavat",
       phones: ['+998 50 117 11 55'], hours: null,
       insta: 'legenda_premium_asaka', tg: null,
       // Asakadan faqat kechki vitrina rasmi bor — kunduzgi ko'rinish shu rasmdan filtr bilan olinadi
       day: 'assets/filial/asaka_tun.jpg', dayify: true, night: null, inside: 'assets/filial/asaka_ichkari.jpg',
-      thumb: 'assets/filial/asaka_resepshn.jpg', door: [48, 52],
+      thumb: 'assets/filial/asaka_resepshn_kichik.jpg', door: [48, 52],
     },
     andijon: {
-      city: 'Andijon', title: 'Legenda Andijon', pin: [1270, 560], side: 72,
+      city: 'Andijon', title: 'Legenda Andijon', pin: [1270, 560], vpin: [1430, 505], side: 89,
       street: "Furqat ko'chasi, 136-uy", address: "Andijon sh., Furqat ko'chasi 136-uy", landmark: "Oq laylak to'yxonasi oldida",
       phones: ['+998 88 480 71 71', '+998 93 100 78 13'], hours: 'har kuni 08:00 – 02:00',
       insta: 'legenda_andijon', tg: 'https://t.me/LEGENDA_AND1',
       day: 'assets/filial/andijon_kun.jpg', night: 'assets/filial/andijon_tun.jpg', inside: 'assets/filial/andijon_ichkari.jpg',
-      thumb: 'assets/filial/andijon_tun.jpg', door: [50, 60],
+      thumb: 'assets/filial/andijon_tun_kichik.jpg', door: [50, 60],
     },
   };
   const ORDER = ['shahrixon', 'asaka', 'andijon']; // xaritada chapdan o'ngga (g'arbdan sharqqa)
@@ -60,7 +61,10 @@
     };
   }
 
-  const MAP_SVG = (() => {
+  // chizilgan vodiy (~1500 element) faqat intro videosi bo'lmasa kerak — o'shanda bir marta yasaladi
+  let mapCache = null;
+  const mapSvg = () => mapCache || (mapCache = drawMap());
+  function drawMap() {
     const r = rng(20261031), H0 = 250, f = n => n.toFixed(1);
     const pick = a => a[Math.floor(r() * a.length)];
     const depth = y => clamp((y - H0) / (900 - H0)); // ufqda 0, pastda 1
@@ -155,7 +159,7 @@
     return `<svg viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">${defs}
       <rect width="1600" height="900" fill="url(#gGround)"/><rect width="1600" height="${H0 + 20}" fill="url(#gSky)"/>
       ${s}<rect y="150" width="1600" height="300" fill="url(#gHaze)"/></svg>`;
-  })();
+  }
 
   // 1600x900 kadrdagi nuqtani "cover" qilingan ekran nuqtasiga aylantiradi
   function coverPoint([x, y], w, h) {
@@ -167,10 +171,10 @@
 
   const intro = $('#top'), sky = $('#sky'), valley = $('#valley'), cloudsEl = $('#clouds');
   const introTitle = $('#introTitle'), choose = $('#choose'), pinsEl = $('#pins'), pickEl = $('#pick'), skip = $('#skip');
-  $('#introMap').innerHTML = MAP_SVG;
+  const introHint = $('#introHint'), introMap = $('#introMap'), introVideo = $('#introVideo');
 
   const clouds = [];
-  (() => {
+  function makeClouds() {
     const r = rng(7);
     for (let i = 0; i < 40; i++) {
       const d = r(), w = lerp(38, 105, d), el = document.createElement('div');
@@ -189,7 +193,7 @@
       cloudsEl.appendChild(el);
       clouds.push({ el, d, x, y });
     }
-  })();
+  }
 
   function applyIntro(t) {
     // 1) kamera pastga tushadi — bulutlar yuqoriga ko'tarilib ekranni qoplaydi
@@ -208,12 +212,22 @@
     introTitle.style.transform = `translateY(${-ramp(t, 0.1, 0.3) * 40}px)`;
   }
 
-  let introDone = false, introRaf = 0;
-  let INTRO_VIDEO = null; // Higgsfield intro.mp4 o'ynayotgan bo'lsa — o'sha <video>
+  // Higgsfield intro.mp4 — sahifa video bilan ochiladi (index.html: poster, .vmode). Video ochilmasa (fayl yo'q) —
+  // chizilgan xarita va bulutlar yasaladi.
+  let VMODE = true;
+  let INTRO_VIDEO = null; // o'sha <video>, birinchi kadri kelgach
+  function drawIntro() {
+    VMODE = false; intro.classList.remove('vmode');
+    introVideo.hidden = true; introMap.innerHTML = mapSvg(); introMap.hidden = false;
+    sky.hidden = false; cloudsEl.hidden = false; makeClouds();
+    if (J && J.L.map) J.L.map.innerHTML = mapSvg();
+    placePins(); sizeJourneyMap(); render();
+  }
+  let introShown = false; // tanlov (sarlavha + kartalar) ko'rinib turibdimi
   function placePins() {
-    const b = intro.getBoundingClientRect();
+    const b = valley.getBoundingClientRect();
     pinsEl.querySelectorAll('.pin').forEach(p => {
-      const [x, y] = coverPoint(STORES[p.dataset.key].pin, b.width, b.height);
+      const st = STORES[p.dataset.key], [x, y] = coverPoint(VMODE ? st.vpin : st.pin, b.width, b.height);
       p.style.left = x + 'px'; p.style.top = y + 'px';
       // karta ekrandan chiqib ketmasin: nuqta joyida qoladi, karta ichkariga suriladi
       const btn = p.querySelector('button'), w = btn.offsetWidth, pad = 16;
@@ -221,29 +235,64 @@
       btn.style.translate = `${shift}px 0`;
     });
   }
-  function finishIntro() {
-    if (introDone) return;
-    introDone = true; cancelAnimationFrame(introRaf);
-    applyIntro(1); skip.hidden = true;
-    if (INTRO_VIDEO && INTRO_VIDEO.duration) { INTRO_VIDEO.pause(); INTRO_VIDEO.currentTime = INTRO_VIDEO.duration - 0.05; }
-    placePins();
-    choose.classList.add('show');
-    pinsEl.querySelectorAll('.pin').forEach((p, i) => setTimeout(() => p.classList.add('show'), reduced ? 0 : 250 + i * 180));
-    pickEl.classList.add('show');
+  // Skroll intro bo'limining qayerida: 0 — tepasi (osmon), 1 — oxiri (vodiy, tanlov)
+  function introProgress() {
+    if (reduced) return 1;
+    const len = intro.offsetHeight - innerHeight;
+    return len > 0 ? clamp((scrollY - intro.offsetTop) / len) : 1;
   }
-  function playIntro() {
-    if (reduced) return finishIntro();
-    const DUR = 5600; let t0 = null;
-    const step = ts => {
-      if (t0 === null) t0 = ts;
-      const t = clamp((ts - t0) / DUR);
-      applyIntro(ease(t));
-      if (t < 1) introRaf = requestAnimationFrame(step); else finishIntro();
+  const introEndY = () => intro.offsetTop + Math.max(0, intro.offsetHeight - innerHeight);
+
+  function showChoice(on) {
+    if (on === introShown) return;
+    introShown = on;
+    if (on) placePins();
+    choose.classList.toggle('show', on);
+    pickEl.classList.toggle('show', on);
+    pinsEl.querySelectorAll('.pin').forEach((p, i) => {
+      clearTimeout(p.showTimer);
+      if (on) p.showTimer = setTimeout(() => p.classList.add('show'), reduced ? 0 : 250 + i * 180);
+      else p.classList.remove('show');
+    });
+  }
+
+  // Video skrolldan biroz orqada "suzib" boradi — g'ildirak qadamlari sakramasin.
+  // Keyingi seek oldingisi tugagach ('seeked') beriladi: dekoder qancha tez bo'lsa, shuncha tez,
+  // navbat ham tiqilmaydi. busy() — video hali surilyaptimi; seek(t) — t (0–1) holatga suradi,
+  // seek berilgan bo'lsa true qaytaradi.
+  function scrubber(busy, seek) {
+    const s = { t: 0, target: 0, last: 0, wait: 0 };
+    s.run = () => {
+      clearTimeout(s.wait);
+      if (busy()) return;
+      const now = performance.now(), dt = Math.min(0.1, (now - s.last) / 1000);
+      s.last = now;
+      s.t += (s.target - s.t) * (1 - Math.exp(-dt / 0.12));
+      if (Math.abs(s.target - s.t) < 0.0004) s.t = s.target;
+      if (!seek(s.t) && s.t !== s.target) s.wait = setTimeout(s.run, 16);
     };
-    applyIntro(0);
-    setTimeout(() => { introRaf = requestAnimationFrame(step); }, 900);
+    // ochilganda boshidan "suzib" kelmasin — darhol skroll turgan kadr
+    s.jump = () => { s.t = s.target; s.last = performance.now(); };
+    return s;
   }
-  skip.addEventListener('click', finishIntro);
+  const seekTo = (v, want) => Math.abs(v.currentTime - want) > 0.004 && ((v.currentTime = want), true);
+  const introScrub = scrubber(
+    () => !INTRO_VIDEO || !INTRO_VIDEO.duration || INTRO_VIDEO.seeking,
+    t => seekTo(INTRO_VIDEO, t * (INTRO_VIDEO.duration - 0.05)));
+
+  function renderIntro(p) {
+    if (VMODE) {
+      introScrub.target = p; introScrub.run();
+      introTitle.style.opacity = 1 - ramp(p, 0.03, 0.16);
+      introTitle.style.transform = `translateY(${-ramp(p, 0.03, 0.16) * 40}px)`;
+    } else {
+      applyIntro(p);
+    }
+    introHint.style.opacity = p < 0.02 ? 1 : 0;
+    skip.hidden = p > 0.9;
+    showChoice(p > 0.96);
+  }
+  skip.addEventListener('click', () => window.scrollTo({ top: introEndY(), behavior: 'smooth' }));
 
   // Tanlov tugmalari: kompyuterda xaritadagi pinlar, telefonda pastdagi kartalar
   ORDER.forEach(key => {
@@ -263,19 +312,6 @@
     pickEl.appendChild(card);
   });
 
-  // Higgsfield intro.mp4 tayyor bo'lsa — bulut animatsiyasi o'rniga o'sha o'ynaydi
-  function tryVideo(src, timeout = 2500) {
-    return new Promise(resolve => {
-      const v = document.createElement('video');
-      v.muted = true; v.playsInline = true; v.preload = 'auto';
-      const done = ok => { clearTimeout(tm); v.onloadeddata = v.onerror = null; resolve(ok ? v : null); };
-      const tm = setTimeout(() => done(false), timeout);
-      v.onloadeddata = () => done(true);
-      v.onerror = () => done(false);
-      v.src = src;
-    });
-  }
-
   /* ---------- DO'KONGA KIRISH ---------- */
 
   const journey = $('#journey'), stage = $('#stage'), layersEl = $('#layers'), capEl = $('#cap'), hint = $('#hint');
@@ -292,16 +328,18 @@
 
   async function buildJourney(key) {
     const st = STORES[key];
-    layersEl.innerHTML = ''; capEl.innerHTML = '';
-    const L = {
-      // haqiqiy intro bo'lsa — uning oxirgi kadridan sho'ng'iymiz, bo'lmasa chizilgan xaritadan
-      map: layer(INTRO_VIDEO ? '<img src="assets/video/intro_end.jpg" alt="">' : MAP_SVG),
-      day: layer(`<img src="${st.day}" alt="">`),
-      night: st.night ? layer(`<img src="${st.night}" alt="">`) : null,
-      inside: layer(`<img src="${st.inside}" alt="">`),
+    layersEl.innerHTML = ''; capEl.innerHTML = ''; stage.classList.remove('film');
+    // haqiqiy intro bo'lsa — uning oxirgi kadridan sho'ng'iymiz, bo'lmasa chizilgan xaritadan.
+    // Filial rasmlari faqat kinosiz animatsiya uchun — kino (FILMS) bo'lsa ular yuklanmaydi.
+    const L = { map: layer(VMODE ? '<img src="assets/video/intro_end.jpg" alt="">' : mapSvg()), day: null, night: null, inside: null };
+    const photos = () => {
+      L.day = layer(`<img src="${st.day}" alt="">`);
+      L.night = st.night ? layer(`<img src="${st.night}" alt="">`) : null;
+      L.inside = layer(`<img src="${st.inside}" alt="">`);
+      const origin = `${st.door[0]}% ${st.door[1]}%`;
+      [L.day, L.night, L.inside].forEach(el => el && (el.style.transformOrigin = origin));
     };
-    const origin = `${st.door[0]}% ${st.door[1]}%`;
-    [L.day, L.night, L.inside].forEach(el => el && (el.style.transformOrigin = origin));
+    if (!FILMS[key]) photos();
     stage.style.setProperty('--gx', st.door[0] + '%');
     stage.style.setProperty('--gy', st.door[1] + '%');
     const n = PRODUCTS.filter(p => p.store === key).length;
@@ -309,38 +347,165 @@
       { k: st.title, h: st.city, s: 'xush kelibsiz' },
       { k: 'Manzil', h: st.street, p: st.landmark === st.street ? st.address : `${st.address} · ${st.landmark}` },
       st.hours ? { k: 'Har kuni ochiq', h: st.hours.replace('har kuni ', ''), s: 'kechqurun ham kutamiz' } : { k: 'Kechki Legenda', h: 'Chiroqlar yondi', s: 'ichkariga marhamat' },
-      { k: 'Ichkarida', h: `${n} ta model`, p: 'Pastga suring — narxlari bilan katalog' },
-    ].map(c => {
+      // kiyimlar bo'lsa eshikdan to'g'ri ularga o'tamiz — "Ichkarida N ta model" yozuvi yo'q
+      !hasTry(key) && { k: 'Ichkarida', h: `${n} ta model`, p: 'Pastga suring — narxlari bilan katalog' },
+    ].filter(Boolean).map(c => {
       const el = document.createElement('div');
       el.className = 'c' + (c.h.length > 14 ? ' long' : '');
       el.innerHTML = `<span class="kicker k">${esc(c.k)}</span><h2>${esc(c.h)}</h2>${c.s ? `<span class="s">${esc(c.s)}</span>` : ''}${c.p ? `<p>${esc(c.p)}</p>` : ''}`;
       capEl.appendChild(el);
       return el;
     });
-    J = { key, st, L, caps, videos: null, phases: [0, .24, .45, .72, 1] };
+    (J && J.blobs || []).forEach(u => URL.revokeObjectURL(u));
+    J = { key, st, L, caps, film: null, cur: -1, look: -1, blobs: [], phases: [0, .24, .45, .72, 1] };
+    journey.style.height = '';
     sizeJourneyMap();
 
-    // Higgsfield kliplari (A–D) bo'lsa — kadrlar o'rniga videolar
-    const vids = await Promise.all(['A', 'B', 'C', 'D'].map(x => tryVideo(`assets/video/${key}_${x}.mp4`)));
-    if (J && J.key === key && vids.every(Boolean)) {
-      Object.values(L).forEach(el => el && el.remove());
-      J.videos = vids.map(v => { const el = layer(''); el.appendChild(v); return el; });
-      J.phases = [0, .25, .5, .75, 1];
-      render();
+    // Higgsfield kliplari bo'lsa — kadrlar o'rniga kino. Tahrir (FILMS) bo'lmasa yoki uning fayllaridan biri
+    // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D). Avval faqat videolarning boshi (metadata,
+    // bir necha KB) olinadi — kino darhol tayyor; to'liq fayllar keyin navbat bilan yuklanadi (preloadFilm).
+    const url = x => x.c ? `assets/video/${key}_${x.c}.mp4` : x.vid ? `assets/${x.vid}.mp4` : `assets/${x.img}.jpg`;
+    const load = x => x.c || x.vid ? videoMeta(url(x)) : loadImg(url(x));
+    let plan = FILMS[key], media = plan && await Promise.all(plan.map(load));
+    if (!media || media.includes(null)) {
+      plan = [...'ABCDEFG'].map(c => ({ c }));
+      media = await Promise.all(plan.map(load));
+      const m = media.includes(null) ? media.indexOf(null) : media.length;
+      plan = plan.slice(0, m); media = media.slice(0, m);
     }
+    if (!(J && J.key === key)) return;
+    if (plan.length < 4) { if (!L.day) { photos(); render(); } return; }
+    Object.values(L).forEach(el => el && el.remove());
+    stage.classList.add('film');
+    let at = 0;
+    J.film = plan.map((x, k) => {
+      const v = x.c || x.vid ? media[k] : null, el = layer('');
+      el.appendChild(media[k]);
+      if (x.look != null) el.classList.add('try');
+      const to = v ? v.duration - 0.05 : 0;
+      const it = { c: x.c, look: x.look, el, v, from: 0, to, w: x.w || to, fade: x.fade || 0, push: x.push ?? 0.08, at };
+      if (v) v.addEventListener('seeked', journeyScrub.run);
+      at += it.w;
+      return it;
+    });
+    J.total = at;
+    // yozuvlar: A–B shahar, C fasad, D kechqurun, E — kirish; keyin kiyimlar (kartochka)
+    const atOf = c => { const it = J.film.find(x => x.c === c); return it && it.at / at; };
+    const tryIt = J.film.find(x => x.look != null);
+    J.tryAt = tryIt ? tryIt.at / at : null;
+    J.phases = atOf('E') ? [0, atOf('C'), atOf('D'), atOf('E'), J.tryAt ?? 1, 1] : [0, .25, .5, .75, 1];
+    stepsLi[4].hidden = J.tryAt == null;
+    sizeJourney();
+    journeyScrub.target = journeyProgress(); journeyScrub.jump();
+    render();
+    preloadFilm(J);
+  }
+
+  // Kino tahriri: Higgsfield kliplarining xira yoki sifatsiz joylari fayldan kesilgan (skript: TRIM, SKIP).
+  // c — do'kon klipi harfi; vid/img — assets/ ichidagi video yoki rasm; w — necha "soniya" turadi (video uchun
+  // berilmasa — uzunligi); fade — oldingi kadrdan shuncha soniyada erib o'tish; push — rasm sekin yaqinlashishi;
+  // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi.
+  const FILMS = {
+    // eshikdan kirgach — kiyimlar: har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
+    andijon: [{ c: 'A' }, { c: 'B', fade: 0.8 }, { c: 'C' }, { c: 'D' }, { c: 'E' },
+      { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', w: 8, fade: 1, look: 0 },
+      { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', w: 8, fade: 1, look: 1 },
+      { img: 'kiyim/ilgich_LG-013', w: 1.8, fade: 1, push: 0.03, look: 2 }, { img: 'kiyim/orta_LG-013', w: 3, fade: 1, push: 0.03, look: 2 }],
+  };
+  const LOOKS = ['LG-014', 'LG-018', 'LG-013'];
+  const hasTry = key => !!(FILMS[key] && FILMS[key].some(x => x.look != null));
+  const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+  // video elementi faqat metadata bilan (uzunligi ma'lum bo'ladi), 10 s ichida kelmasa — null
+  const videoMeta = src => new Promise(res => {
+    const v = document.createElement('video');
+    v.muted = true; v.playsInline = true; v.preload = 'metadata';
+    const tm = setTimeout(() => res(null), 10000);
+    v.onloadedmetadata = () => { clearTimeout(tm); res(v); };
+    v.onerror = () => { clearTimeout(tm); res(null); };
+    v.src = src;
+  });
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const once = (el, ev) => new Promise(r => el.addEventListener(ev, r, { once: true }));
+  // Kino videolari tartib bilan to'liq yuklanib, xotiraga olinadi (blob) — keyin skroll bilan surish tarmoqni
+  // kutmaydi va qotmaydi. Yangi video eskisi turgan kadrga surilib, uning ostiga qo'yiladi; kadr chizilgach eskisi
+  // olib tashlanadi — ko'rinib turgan video ham sezilmay almashadi.
+  async function preloadFilm(j) {
+    for (const it of j.film) {
+      if (!it.v) continue;
+      let blob = null;
+      try { const r = await fetch(it.v.src); if (r.ok) blob = await r.blob(); } catch { /* file:// — tarmoqdan qoladi */ }
+      if (J !== j) return;
+      if (!blob) continue;
+      const u = URL.createObjectURL(blob), v = await videoMeta(u), old = it.v;
+      j.blobs.push(u);
+      if (J !== j) return;
+      if (!v) continue;
+      it.el.insertBefore(v, old);
+      v.currentTime = old.currentTime;
+      await once(v, 'seeked');
+      // kadr ekranga chiqquncha (yashirin varaqda requestVideoFrameCallback kelmasligi mumkin — 300 ms dan keyin baribir)
+      await Promise.race([new Promise(r => v.requestVideoFrameCallback ? v.requestVideoFrameCallback(r) : requestAnimationFrame(r)), sleep(300)]);
+      if (J !== j) return;
+      v.addEventListener('seeked', journeyScrub.run);
+      it.v = v;
+      if (j.film[j.cur] === it) j.ready = true; // eskisining 'seeked' i endi kelmaydi
+      old.remove(); old.removeAttribute('src'); old.load();
+      journeyScrub.run();
+    }
+  }
+
+  // Kino intro kabi suriladi: t (0–1) — hamma bo'laklar bo'ylab bitta uzluksiz vaqt.
+  // Bo'lak almashganda yangisi kerakli kadrga surilib bo'lgach ko'rsatiladi, qo'shnilari esa oldindan
+  // chegara kadrga qo'yiladi (A oxiri = B boshi) — chok ko'rinmaydi.
+  const journeyScrub = scrubber(
+    () => { const it = J && J.film && J.film[Math.max(0, J.cur)]; return !it || (it.v && (!it.v.duration || it.v.seeking)); },
+    t => {
+      const F = J.film, pos = t * J.total;
+      let i = 0;
+      while (i < F.length - 1 && pos >= F[i + 1].at) i++;
+      const it = F[i];
+      J.local = clamp((pos - it.at) / it.w);
+      const moved = !!it.v && seekTo(it.v, it.from + J.local * (it.to - it.from));
+      if (i !== J.cur) {
+        J.cur = i; J.ready = !moved;
+        if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
+        [i - 1, i + 1].forEach(k => { const n = F[k]; if (n && n.v && n.v.duration) seekTo(n.v, k < i ? n.to : n.from); });
+      }
+      if (J.ready) paintFilm();
+      return moved;
+    });
+
+  // "fade" bo'lsa, bo'lak boshida oldingi kadr (oxirida to'xtagan) ostida biroz kattalashib eriydi.
+  // Rasmlar o'z vaqti davomida sekin yaqinlashadi. Ko'rinmaydigan qatlamlar chizilmaydi (visibility) — tezroq.
+  function paintFilm() {
+    const F = J.film, i = J.cur, f = F[i].fade ? clamp(J.local * F[i].w / F[i].fade) : 1;
+    F.forEach((x, k) => {
+      const out = k === i - 1 && f < 1, o = k === i ? f : out ? 1 : 0;
+      x.el.style.opacity = o.toFixed(3);
+      x.el.style.visibility = o > 0 ? 'visible' : 'hidden';
+      const push = x.v ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
+      x.el.style.transform = `scale(${(push * (out ? lerp(1, 1.06, f) : 1)).toFixed(4)})`;
+    });
+    showLook(F[i].look);
   }
 
   function sizeJourneyMap() {
     if (!J || !J.L.map) return;
-    if (INTRO_VIDEO) { J.L.map.style.transformOrigin = `${J.st.side}% 62%`; return; }
+    if (VMODE) { J.L.map.style.transformOrigin = `${J.st.side}% 62%`; return; }
     const [x, y] = coverPoint(J.st.pin, stage.clientWidth, stage.clientHeight);
     J.L.map.style.transformOrigin = `${x}px ${y}px`;
   }
 
+  // ~21vh skroll = kinoning 1 soniyasi
+  function sizeJourney() {
+    if (J && J.film) journey.style.height = `${100 + 21 * J.total}vh`;
+  }
   function journeyProgress() {
     const top = journey.offsetTop, len = journey.offsetHeight - innerHeight;
     return clamp((scrollY - top) / len);
   }
+  // kinoning t (0–1) nuqtasiga skroll
+  const scrollToFilm = t => window.scrollTo({ top: journey.offsetTop + t * (journey.offsetHeight - innerHeight), behavior: reduced ? 'auto' : 'smooth' });
 
   function setLayer(el, opacity, scale, filter = '') {
     if (!el) return;
@@ -351,16 +516,8 @@
 
   function renderJourney(p) {
     const { L, st, phases: P, caps } = J;
-    if (J.videos) {
-      const seg = Math.min(3, Math.floor(p * 4)), local = p * 4 - seg;
-      J.videos.forEach((el, i) => {
-        el.style.opacity = i === seg ? 1 : 0;
-        const v = el.firstChild;
-        if (i === seg && v.duration) {
-          const want = local * (v.duration - 0.05);
-          if (Math.abs(v.currentTime - want) > 0.02) v.currentTime = want;
-        }
-      });
+    if (J.film) {
+      journeyScrub.target = p; journeyScrub.run();
       [ovDay, ovNight, ovGlow, ovWarm].forEach(o => (o.style.opacity = 0));
     } else {
       const hasNight = !!L.night;
@@ -393,23 +550,28 @@
       ovGlow.style.opacity = (ramp(p, P[2] + 0.1, P[3]) * (st.dayify ? 0.5 : 1) * fadeForReal).toFixed(3);
       ovWarm.style.opacity = (inside * 0.9).toFixed(3);
     }
-    // yozuvlar
+    // yozuvlar: har biri o'z bo'lagida; oxirgisi kiyimlar boshlanganda (yoki hech qachon) so'nadi
     caps.forEach((el, i) => {
       const a = P[i], b = P[i + 1];
-      const o = ramp(p, a + 0.015, a + 0.06) * (i === 3 ? 1 : 1 - ramp(p, b - 0.06, b - 0.015));
+      const o = ramp(p, a + 0.015, a + 0.06) * (b >= 1 ? 1 : 1 - ramp(p, b - 0.06, b - 0.015));
       el.style.opacity = (i === 0 ? Math.max(o, 1 - ramp(p, b - 0.06, b - 0.015)) : o).toFixed(3);
       el.style.transform = `translateY(${((1 - o) * 18).toFixed(1)}px)`;
     });
-    const seg = p < P[1] ? 0 : p < P[2] ? 1 : p < P[3] ? 2 : 3;
+    let seg = 0;
+    while (seg < stepsLi.length - 1 && P[seg + 1] < 1 && p >= P[seg + 1]) seg++;
     stepsLi.forEach((li, i) => li.classList.toggle('on', i === seg));
     trackFill.style.width = (p * 100).toFixed(2) + '%';
     hint.style.opacity = 1 - ramp(p, 0.01, 0.05);
+    // kiyim xonasi yorug' — pastki yozuvlar qora, chetdagi qoraytirish yo'q
+    stage.classList.toggle('light', J.tryAt != null && p >= J.tryAt);
   }
 
   /* ---------- KATALOG ---------- */
 
   const catalog = $('#katalog'), grid = $('#grid'), chips = $('#chips');
   function orderLink(st) { return st.phones.length ? tel(st.phones[0]) : `https://instagram.com/${st.insta}`; }
+  const partsHtml = p => p.tarkibi ? `<ul class="parts">${p.tarkibi.map(t => `<li><span>${esc(t.nomi)}</span><b>${som(t.narx)}</b></li>`).join('')}</ul>` : '';
+  const sizesHtml = p => p.razmerlar ? `<div class="sizes">${p.razmerlar.split(/,\s*/).map(s => `<span>${esc(s)}</span>`).join('')}</div>` : '';
 
   function renderCatalog(key) {
     const st = STORES[key], items = PRODUCTS.filter(p => p.store === key);
@@ -430,8 +592,8 @@
             <span class="id">${p.id}</span>
             <h3>${esc(p.nomi)}</h3>
             <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>
-            ${p.tarkibi ? `<ul class="parts">${p.tarkibi.map(t => `<li><span>${esc(t.nomi)}</span><b>${som(t.narx)}</b></li>`).join('')}</ul>` : ''}
-            ${p.razmerlar ? `<div class="sizes">${p.razmerlar.split(/,\s*/).map(s => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
+            ${partsHtml(p)}
+            ${sizesHtml(p)}
             <a class="btn" href="${orderLink(st)}">Buyurtma berish</a>
           </div>
         </article>`).join('');
@@ -443,6 +605,38 @@
     };
     draw('');
   }
+
+  /* ---------- KIYIMLAR (kino ichida) ---------- */
+  // Eshikdan kirgach kino kiyim xonasiga o'tadi: har kiyim ilgichda, keyin model shu kiyimda skroll bilan aylanadi
+  // (FILMS dagi look). O'ngda — shu kiyimning kartochkasi: narx, tarkibi, razmerlar, buyurtma.
+  const lookCard = $('#lookCard'), lookInfo = $('#lookInfo'), lookCount = $('#lookCount'), lookThumbs = $('#lookThumbs');
+  lookThumbs.innerHTML = LOOKS.map((id, i) =>
+    `<button type="button" data-i="${i}" aria-label="${id}"><img src="assets/kiyim/ilgich_${id}.jpg" alt="" loading="lazy"></button>`).join('');
+
+  function showLook(i) {
+    if (!J || i === J.look) return;
+    J.look = i ?? -1;
+    lookCard.classList.toggle('show', J.look >= 0);
+    if (J.look < 0) return;
+    const p = PRODUCTS.find(x => x.id === LOOKS[J.look]);
+    lookCount.textContent = `0${J.look + 1} / 0${LOOKS.length}`;
+    lookInfo.innerHTML = p ? `<span class="id">${p.id} · ${esc(CAT[p.kategoriya] || p.kategoriya)}</span><h3>${esc(p.nomi)}</h3>
+      <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>${partsHtml(p)}${sizesHtml(p)}
+      <a class="btn" href="${orderLink(J.st)}">Buyurtma berish</a>` : '';
+    lookThumbs.querySelectorAll('button').forEach((b, k) => b.classList.toggle('on', k === J.look));
+  }
+  // kiyimga o'tish — kinoning o'sha joyiga skroll (ilgich to'liq ko'ringan nuqta)
+  function goLook(i) {
+    if (!J || !J.film) return;
+    const it = J.film.find(x => x.look === (i + LOOKS.length) % LOOKS.length);
+    if (it) scrollToFilm((it.at + it.fade) / J.total + 0.001);
+  }
+  lookThumbs.addEventListener('click', e => { const b = e.target.closest('button'); if (b) goLook(+b.dataset.i); });
+  $('#lookPrev').addEventListener('click', () => goLook(J.look - 1));
+  $('#lookNext').addEventListener('click', () => goLook(J.look + 1));
+  // menyudagi "Kiyib ko'rish" — kiyimlar boshiga
+  const navTry = $('#navTry');
+  navTry.addEventListener('click', e => { e.preventDefault(); goLook(0); });
 
   /* ---------- ALOQA ---------- */
 
@@ -464,48 +658,52 @@
 
   const nav = $('#nav'), navCatalog = $('#navCatalog');
   function enter(key) {
-    finishIntro();
     buildJourney(key);
     renderCatalog(key);
     journey.hidden = false; catalog.hidden = false; navCatalog.hidden = false;
+    navTry.hidden = !(FILMS[key] && FILMS[key].some(x => x.look != null));
     history.replaceState(null, '', '#' + key);
     requestAnimationFrame(() => {
       sizeJourneyMap(); render();
       window.scrollTo({ top: journey.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
     });
   }
-  $('#back').addEventListener('click', () => window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
+  // "← Filiallar": intro boshiga emas, tanlov turgan oxiriga
+  $('#back').addEventListener('click', () => window.scrollTo({ top: introEndY(), behavior: reduced ? 'auto' : 'smooth' }));
 
   let ticking = false;
   function render() {
     ticking = false;
-    const y = scrollY;
-    const inJourney = J && !journey.hidden && y >= journey.offsetTop - innerHeight && y <= journey.offsetTop + journey.offsetHeight;
-    if (inJourney) renderJourney(journeyProgress());
-    const overJourney = J && !journey.hidden && y >= journey.offsetTop - 60 && y < journey.offsetTop + journey.offsetHeight - innerHeight;
+    // avval hamma o'lchamlar o'qiladi, keyin uslublar yoziladi — brauzer har kadrda sahifani qayta hisoblamaydi
+    const y = scrollY, ip = introProgress(), introEnd = introEndY();
+    const live = J && !journey.hidden, top = journey.offsetTop, h = journey.offsetHeight;
+    const jp = live ? journeyProgress() : 0;
+    renderIntro(ip);
+    if (live && y >= top - innerHeight && y <= top + h) renderJourney(jp);
+    // kino ustida menyu qora, yorug' kiyim xonasi ustida — oddiy
+    const inTry = live && J.film && J.tryAt != null && jp >= J.tryAt;
+    const overJourney = live && !inTry && y >= top - 60 && y < top + h - 60;
     nav.classList.toggle('dark', !!overJourney);
-    nav.classList.toggle('solid', !overJourney && y > innerHeight * 0.6);
+    nav.classList.toggle('solid', !overJourney && y > introEnd + innerHeight * 0.6);
   }
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
-  addEventListener('resize', () => { placePins(); sizeJourneyMap(); render(); });
+  addEventListener('resize', () => { placePins(); sizeJourneyMap(); sizeJourney(); render(); });
 
-  // Ishga tushirish
+  // Ishga tushirish: intro videosi darhol ulanadi va brauzer uni o'zi yuklab boradi (preload="auto") — butun fayl
+  // kelishini kutmasdan skroll bilan suriladi. Filial (#andijon) ham darhol ochiladi.
   (async () => {
     const hash = location.hash.slice(1);
-    const v = await tryVideo('assets/video/intro.mp4', 1500);
-    if (v && !reduced) {
-      const iv = $('#introVideo');
-      INTRO_VIDEO = iv; intro.classList.add('vmode');
-      iv.src = v.src; iv.hidden = false; $('#introMap').hidden = true;
-      sky.hidden = true; cloudsEl.hidden = true; valley.style.transform = 'none';
-      introTitle.style.transition = 'opacity 1s'; setTimeout(() => (introTitle.style.opacity = 0), 1600);
-      iv.addEventListener('ended', finishIntro, { once: true });
-      skip.addEventListener('click', () => { iv.currentTime = Math.max(0, iv.duration - 0.05); iv.pause(); });
-      iv.play().catch(finishIntro);
-    } else if (!STORES[hash]) {
-      playIntro();
-    }
+    const ok = new Promise(res => {
+      introVideo.addEventListener('loadeddata', () => res(true), { once: true });
+      introVideo.addEventListener('error', () => res(false), { once: true });
+    });
+    introVideo.src = 'assets/video/intro.mp4';
     if (STORES[hash]) enter(hash);
     render();
+    if (!(await ok)) { drawIntro(); return; }
+    INTRO_VIDEO = introVideo;
+    introScrub.jump();
+    introVideo.addEventListener('seeked', introScrub.run);
+    introScrub.run();
   })();
 })();
