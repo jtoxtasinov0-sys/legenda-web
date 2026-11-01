@@ -17,10 +17,11 @@
   const tel = s => 'tel:' + s.replace(/[^\d+]/g, '');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  // Vodiy kadri 1600x900. pin — chizilgan xaritadagi joy; side — haqiqiy intro kadrida qaysi tomonga sho'ng'ish (% eni).
+  // Vodiy kadri 1600x900. pin — chizilgan xaritadagi joy; vpin — Higgsfield intro videosining oxirgi kadridagi shahar;
+  // side — o'sha kadrda qaysi tomonga sho'ng'ish (% eni).
   const STORES = {
     shahrixon: {
-      city: 'Shahrixon', title: 'Legenda Premium', pin: [330, 600], side: 28,
+      city: 'Shahrixon', title: 'Legenda Premium', pin: [330, 600], vpin: [200, 545], side: 12,
       street: "Hamza ko'chasi", address: "Shahrixon sh., Hamza ko'chasi", landmark: "2-maktab oldida",
       phones: ['+998 93 372 88 55'], hours: null,
       insta: 'legenda_shahrixon', tg: 'https://t.me/Legenda_Premium1',
@@ -28,7 +29,7 @@
       thumb: 'assets/filial/shahrixon_kun.jpg', door: [50, 58],
     },
     asaka: {
-      city: 'Asaka', title: 'Legenda Premium', pin: [800, 680], side: 50,
+      city: 'Asaka', title: 'Legenda Premium', pin: [800, 680], vpin: [800, 600], side: 50,
       street: "Sharq to'yxonasi, 1-qavat", address: "Asaka sh., Imom Buxoriy ko'chasi", landmark: "Sharq to'yxonasi, 1-qavat",
       phones: ['+998 50 117 11 55'], hours: null,
       insta: 'legenda_premium_asaka', tg: null,
@@ -37,7 +38,7 @@
       thumb: 'assets/filial/asaka_resepshn.jpg', door: [48, 52],
     },
     andijon: {
-      city: 'Andijon', title: 'Legenda Andijon', pin: [1270, 560], side: 72,
+      city: 'Andijon', title: 'Legenda Andijon', pin: [1270, 560], vpin: [1430, 505], side: 89,
       street: "Furqat ko'chasi, 136-uy", address: "Andijon sh., Furqat ko'chasi 136-uy", landmark: "Oq laylak to'yxonasi oldida",
       phones: ['+998 88 480 71 71', '+998 93 100 78 13'], hours: 'har kuni 08:00 – 02:00',
       insta: 'legenda_andijon', tg: 'https://t.me/LEGENDA_AND1',
@@ -167,6 +168,7 @@
 
   const intro = $('#top'), sky = $('#sky'), valley = $('#valley'), cloudsEl = $('#clouds');
   const introTitle = $('#introTitle'), choose = $('#choose'), pinsEl = $('#pins'), pickEl = $('#pick'), skip = $('#skip');
+  const introHint = $('#introHint');
   $('#introMap').innerHTML = MAP_SVG;
 
   const clouds = [];
@@ -208,12 +210,13 @@
     introTitle.style.transform = `translateY(${-ramp(t, 0.1, 0.3) * 40}px)`;
   }
 
-  let introDone = false, introRaf = 0;
-  let INTRO_VIDEO = null; // Higgsfield intro.mp4 o'ynayotgan bo'lsa — o'sha <video>
+  let VMODE = false;      // Higgsfield intro.mp4 bor — chizilgan xarita o'rniga video
+  let INTRO_VIDEO = null; // o'sha <video>, yuklanib bo'lgach
+  let introShown = false; // tanlov (sarlavha + kartalar) ko'rinib turibdimi
   function placePins() {
-    const b = intro.getBoundingClientRect();
+    const b = valley.getBoundingClientRect();
     pinsEl.querySelectorAll('.pin').forEach(p => {
-      const [x, y] = coverPoint(STORES[p.dataset.key].pin, b.width, b.height);
+      const st = STORES[p.dataset.key], [x, y] = coverPoint(VMODE ? st.vpin : st.pin, b.width, b.height);
       p.style.left = x + 'px'; p.style.top = y + 'px';
       // karta ekrandan chiqib ketmasin: nuqta joyida qoladi, karta ichkariga suriladi
       const btn = p.querySelector('button'), w = btn.offsetWidth, pad = 16;
@@ -221,29 +224,58 @@
       btn.style.translate = `${shift}px 0`;
     });
   }
-  function finishIntro() {
-    if (introDone) return;
-    introDone = true; cancelAnimationFrame(introRaf);
-    applyIntro(1); skip.hidden = true;
-    if (INTRO_VIDEO && INTRO_VIDEO.duration) { INTRO_VIDEO.pause(); INTRO_VIDEO.currentTime = INTRO_VIDEO.duration - 0.05; }
-    placePins();
-    choose.classList.add('show');
-    pinsEl.querySelectorAll('.pin').forEach((p, i) => setTimeout(() => p.classList.add('show'), reduced ? 0 : 250 + i * 180));
-    pickEl.classList.add('show');
+  // Skroll intro bo'limining qayerida: 0 — tepasi (osmon), 1 — oxiri (vodiy, tanlov)
+  function introProgress() {
+    if (reduced) return 1;
+    const len = intro.offsetHeight - innerHeight;
+    return len > 0 ? clamp((scrollY - intro.offsetTop) / len) : 1;
   }
-  function playIntro() {
-    if (reduced) return finishIntro();
-    const DUR = 5600; let t0 = null;
-    const step = ts => {
-      if (t0 === null) t0 = ts;
-      const t = clamp((ts - t0) / DUR);
-      applyIntro(ease(t));
-      if (t < 1) introRaf = requestAnimationFrame(step); else finishIntro();
-    };
-    applyIntro(0);
-    setTimeout(() => { introRaf = requestAnimationFrame(step); }, 900);
+  const introEndY = () => intro.offsetTop + Math.max(0, intro.offsetHeight - innerHeight);
+
+  function showChoice(on) {
+    if (on === introShown) return;
+    introShown = on;
+    if (on) placePins();
+    choose.classList.toggle('show', on);
+    pickEl.classList.toggle('show', on);
+    pinsEl.querySelectorAll('.pin').forEach((p, i) => {
+      clearTimeout(p.showTimer);
+      if (on) p.showTimer = setTimeout(() => p.classList.add('show'), reduced ? 0 : 250 + i * 180);
+      else p.classList.remove('show');
+    });
   }
-  skip.addEventListener('click', finishIntro);
+
+  // Video skrolldan biroz orqada "suzib" boradi — g'ildirak qadamlari sakramasin.
+  // Keyingi seek oldingisi tugagach ('seeked') beriladi: dekoder qancha tez bo'lsa, shuncha tez,
+  // navbat ham tiqilmaydi.
+  let introT = 0, introTarget = 0, introLast = 0, introWait = 0;
+  function scrubIntro() {
+    clearTimeout(introWait);
+    const v = INTRO_VIDEO;
+    if (!v || !v.duration || v.seeking) return;
+    const now = performance.now(), dt = Math.min(0.1, (now - introLast) / 1000);
+    introLast = now;
+    introT += (introTarget - introT) * (1 - Math.exp(-dt / 0.12));
+    if (Math.abs(introTarget - introT) < 0.0004) introT = introTarget;
+    const want = introT * (v.duration - 0.05);
+    if (Math.abs(v.currentTime - want) > 0.004) v.currentTime = want;
+    else if (introT !== introTarget) introWait = setTimeout(scrubIntro, 16);
+  }
+
+  function renderIntro() {
+    const p = introProgress();
+    if (VMODE) {
+      introTarget = p; scrubIntro();
+      introTitle.style.opacity = 1 - ramp(p, 0.03, 0.16);
+      introTitle.style.transform = `translateY(${-ramp(p, 0.03, 0.16) * 40}px)`;
+    } else {
+      applyIntro(p);
+    }
+    introHint.style.opacity = p < 0.02 ? 1 : 0;
+    skip.hidden = p > 0.9;
+    showChoice(p > 0.96);
+  }
+  skip.addEventListener('click', () => window.scrollTo({ top: introEndY(), behavior: 'smooth' }));
 
   // Tanlov tugmalari: kompyuterda xaritadagi pinlar, telefonda pastdagi kartalar
   ORDER.forEach(key => {
@@ -295,7 +327,7 @@
     layersEl.innerHTML = ''; capEl.innerHTML = '';
     const L = {
       // haqiqiy intro bo'lsa — uning oxirgi kadridan sho'ng'iymiz, bo'lmasa chizilgan xaritadan
-      map: layer(INTRO_VIDEO ? '<img src="assets/video/intro_end.jpg" alt="">' : MAP_SVG),
+      map: layer(VMODE ? '<img src="assets/video/intro_end.jpg" alt="">' : MAP_SVG),
       day: layer(`<img src="${st.day}" alt="">`),
       night: st.night ? layer(`<img src="${st.night}" alt="">`) : null,
       inside: layer(`<img src="${st.inside}" alt="">`),
@@ -332,7 +364,7 @@
 
   function sizeJourneyMap() {
     if (!J || !J.L.map) return;
-    if (INTRO_VIDEO) { J.L.map.style.transformOrigin = `${J.st.side}% 62%`; return; }
+    if (VMODE) { J.L.map.style.transformOrigin = `${J.st.side}% 62%`; return; }
     const [x, y] = coverPoint(J.st.pin, stage.clientWidth, stage.clientHeight);
     J.L.map.style.transformOrigin = `${x}px ${y}px`;
   }
@@ -464,7 +496,6 @@
 
   const nav = $('#nav'), navCatalog = $('#navCatalog');
   function enter(key) {
-    finishIntro();
     buildJourney(key);
     renderCatalog(key);
     journey.hidden = false; catalog.hidden = false; navCatalog.hidden = false;
@@ -474,38 +505,51 @@
       window.scrollTo({ top: journey.offsetTop, behavior: reduced ? 'auto' : 'smooth' });
     });
   }
-  $('#back').addEventListener('click', () => window.scrollTo({ top: 0, behavior: reduced ? 'auto' : 'smooth' }));
+  // "← Filiallar": intro boshiga emas, tanlov turgan oxiriga
+  $('#back').addEventListener('click', () => window.scrollTo({ top: introEndY(), behavior: reduced ? 'auto' : 'smooth' }));
 
   let ticking = false;
   function render() {
     ticking = false;
     const y = scrollY;
+    renderIntro();
     const inJourney = J && !journey.hidden && y >= journey.offsetTop - innerHeight && y <= journey.offsetTop + journey.offsetHeight;
     if (inJourney) renderJourney(journeyProgress());
     const overJourney = J && !journey.hidden && y >= journey.offsetTop - 60 && y < journey.offsetTop + journey.offsetHeight - innerHeight;
     nav.classList.toggle('dark', !!overJourney);
-    nav.classList.toggle('solid', !overJourney && y > innerHeight * 0.6);
+    nav.classList.toggle('solid', !overJourney && y > introEndY() + innerHeight * 0.6);
   }
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
   addEventListener('resize', () => { placePins(); sizeJourneyMap(); render(); });
 
   // Ishga tushirish
   (async () => {
-    const hash = location.hash.slice(1);
-    const v = await tryVideo('assets/video/intro.mp4', 1500);
-    if (v && !reduced) {
-      const iv = $('#introVideo');
-      INTRO_VIDEO = iv; intro.classList.add('vmode');
-      iv.src = v.src; iv.hidden = false; $('#introMap').hidden = true;
+    const hash = location.hash.slice(1), iv = $('#introVideo');
+    const useVideo = () => {
+      VMODE = true; intro.classList.add('vmode');
+      iv.poster = 'assets/video/intro_start.jpg'; iv.hidden = false; $('#introMap').hidden = true;
       sky.hidden = true; cloudsEl.hidden = true; valley.style.transform = 'none';
-      introTitle.style.transition = 'opacity 1s'; setTimeout(() => (introTitle.style.opacity = 0), 1600);
-      iv.addEventListener('ended', finishIntro, { once: true });
-      skip.addEventListener('click', () => { iv.currentTime = Math.max(0, iv.duration - 0.05); iv.pause(); });
-      iv.play().catch(finishIntro);
-    } else if (!STORES[hash]) {
-      playIntro();
+    };
+    let src = null;
+    try {
+      // butun fayl xotiraga olinadi — skrollda har kadr tarmoqni kutmaydi, surish silliq bo'ladi
+      const r = await fetch('assets/video/intro.mp4');
+      if (r.ok) { useVideo(); render(); src = URL.createObjectURL(await r.blob()); }
+    } catch {
+      // file:// da fetch ishlamaydi — videoni to'g'ridan-to'g'ri ulaymiz
+      const v = await tryVideo('assets/video/intro.mp4', 2500);
+      if (v) { useVideo(); src = v.src; }
     }
     if (STORES[hash]) enter(hash);
     render();
+    if (src) {
+      iv.src = src;
+      await new Promise(res => iv.addEventListener('loadeddata', res, { once: true }));
+      INTRO_VIDEO = iv;
+      introT = introTarget; // ochilganda boshidan "suzib" kelmasin — darhol skroll turgan kadr
+      introLast = performance.now();
+      iv.addEventListener('seeked', scrubIntro);
+      scrubIntro();
+    }
   })();
 })();

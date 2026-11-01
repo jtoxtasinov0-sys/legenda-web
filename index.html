@@ -27,24 +27,28 @@
 
 <!-- 1. INTRO: bulutlardan vodiyga, 3 ta do'kon tanlovi -->
 <section class="intro" id="top" aria-label="Filialni tanlang">
-  <div class="valley" id="valley">
-    <div class="map" id="introMap"></div>
-    <video id="introVideo" muted playsinline preload="auto" hidden></video>
+  <!-- skroll introni suradi: bo'lim baland, sahna esa ekranga yopishib turadi -->
+  <div class="intro-stage">
+    <div class="valley" id="valley">
+      <div class="map" id="introMap"></div>
+      <video id="introVideo" muted playsinline preload="auto" hidden></video>
+    </div>
+    <div class="sky" id="sky"></div>
+    <div class="clouds" id="clouds" aria-hidden="true"></div>
+    <div class="intro-title" id="introTitle">
+      <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
+      <h1>LEGENDA</h1>
+      <span class="script">3 shahar — bitta uslub</span>
+    </div>
+    <div class="choose" id="choose">
+      <span class="kicker">FARG'ONA VODIYSI</span>
+      <h2>Qaysi filialga <em>kiramiz?</em></h2>
+    </div>
+    <div class="pins" id="pins"></div>
+    <div class="pick" id="pick"></div>
+    <div class="hint" id="introHint"><span>Pastga suring</span><i></i></div>
+    <button class="skip" id="skip" type="button">O'tkazib yuborish</button>
   </div>
-  <div class="sky" id="sky"></div>
-  <div class="clouds" id="clouds" aria-hidden="true"></div>
-  <div class="intro-title" id="introTitle">
-    <span class="kicker">ERKAKLAR KIYIM DO'KONLARI</span>
-    <h1>LEGENDA</h1>
-    <span class="script">3 shahar — bitta uslub</span>
-  </div>
-  <div class="choose" id="choose">
-    <span class="kicker">FARG'ONA VODIYSI</span>
-    <h2>Qaysi filialga <em>kiramiz?</em></h2>
-  </div>
-  <div class="pins" id="pins"></div>
-  <div class="pick" id="pick"></div>
-  <button class="skip" id="skip" type="button">O'tkazib yuborish</button>
 </section>
 
 <!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi -->
