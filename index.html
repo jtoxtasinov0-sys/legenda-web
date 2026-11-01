@@ -11,7 +11,8 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 <!-- sayt Andijon kinosining birinchi kadri bilan ochiladi — video kelguncha shu rasm -->
-<link rel="preload" as="image" href="assets/video/andijon_boshi.jpg">
+<link rel="preload" as="image" href="assets/video/andijon_boshi.jpg" media="(min-aspect-ratio: 4/5)">
+<link rel="preload" as="image" href="assets/video/andijon_boshi_m.jpg" media="(max-aspect-ratio: 4/5)">
 </head>
 <body>
 
@@ -38,6 +39,7 @@
     <div class="ov ov-glow" id="ovGlow"></div>
     <div class="ov ov-warm" id="ovWarm"></div>
     <div class="vignette"></div>
+    <div class="veil" id="veil"></div>
     <div class="cap" id="cap"></div>
     <div class="hint" id="hint"><span>Pastga suring</span><i></i></div>
     <div class="steps" id="steps">
@@ -45,12 +47,12 @@
       <ol><li>Shahar</li><li>Fasad</li><li>Kechqurun</li><li>Ichkari</li><li hidden>Kiyimlar</li></ol>
     </div>
     <aside class="look-card" id="lookCard" aria-live="polite">
-      <div class="try-top"><span class="kicker">LEGENDA XONASI</span><span class="try-count" id="lookCount"></span></div>
+      <div class="try-top"><span class="id" id="lookId"></span><span class="try-count" id="lookCount"></span></div>
       <div class="look-info" id="lookInfo"></div>
       <div class="try-nav">
-        <button type="button" class="arrow" id="lookPrev" aria-label="Oldingi kiyim">←</button>
+        <button type="button" class="arrow" id="lookPrev" aria-label="Oldingi kiyim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <div class="thumbs" id="lookThumbs"></div>
-        <button type="button" class="arrow" id="lookNext" aria-label="Keyingi kiyim">→</button>
+        <button type="button" class="arrow" id="lookNext" aria-label="Keyingi kiyim"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
     </aside>
     <nav class="switch" id="switch" aria-label="Filiallar"></nav>

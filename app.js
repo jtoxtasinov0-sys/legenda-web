@@ -16,6 +16,9 @@
   const esc = s => ap(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const tel = s => 'tel:' + s.replace(/[^\d+]/g, '');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  // tik ekranli telefon: 16:9 videoning faqat o'rtasi ko'rinadi — o'sha qismi kesilgan, ~3 barobar yengil nusxa (_m)
+  const PHONE = matchMedia('(max-aspect-ratio: 4 / 5)').matches, M = PHONE ? '_m' : '';
+  document.documentElement.classList.toggle('phone', PHONE);
 
   // thumb — aloqa bo'limidagi kichik rasm; door — eshik (rasmlar shu nuqtaga yaqinlashadi).
   const STORES = {
@@ -95,7 +98,7 @@
     layersEl.innerHTML = ''; capEl.innerHTML = ''; stage.classList.remove('film');
     // kino (FILMS) bo'lsa — video kelguncha uning birinchi kadri (rasm) ko'rinadi, filial rasmlari yuklanmaydi;
     // kinosiz filial safari to'g'ri filial rasmidan boshlanadi
-    const L = { map: FILMS[key] ? layer(`<img src="assets/video/${key}_boshi.jpg" alt="">`) : null, day: null, night: null, inside: null };
+    const L = { map: FILMS[key] ? layer(`<img src="assets/video/${key}_boshi${M}.jpg" alt="">`) : null, day: null, night: null, inside: null };
     if (L.map) L.map.style.opacity = 1;
     const photos = () => {
       L.day = layer(`<img src="${st.day}" alt="">`);
@@ -130,7 +133,7 @@
     // Higgsfield kliplari bo'lsa — kadrlar o'rniga kino. Tahrir (FILMS) bo'lmasa yoki uning fayllaridan biri
     // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D). Avval faqat videolarning boshi (metadata,
     // bir necha KB) olinadi — kino darhol tayyor; to'liq fayllar keyin navbat bilan yuklanadi (preloadFilm).
-    const url = x => x.c ? `assets/video/${key}_${x.c}.mp4` : x.vid ? `assets/${x.vid}.mp4` : `assets/${x.img}.jpg`;
+    const url = x => x.c ? `assets/video/${key}_${x.c}${M}.mp4` : x.vid ? `assets/${x.vid}${M}.mp4` : `assets/${x.img}.jpg`;
     const load = x => x.c || x.vid ? videoMeta(url(x)) : loadImg(url(x));
     let plan = FILMS[key], media = plan && await Promise.all(plan.map(load));
     if (!media || media.includes(null)) {
@@ -141,7 +144,9 @@
     }
     if (!(J && J.key === key)) return;
     if (plan.length < 4) { if (!L.day) { photos(); render(); } return; }
-    Object.values(L).forEach(el => el && el.remove());
+    // birinchi kadr rasmi (L.map) kino birinchi marta chizilguncha turadi — oraliqda qora ekran chiqmaydi (paintFilm)
+    [L.day, L.night, L.inside].forEach(el => el && el.remove());
+    J.poster = L.map;
     stage.classList.add('film');
     let at = 0;
     J.film = plan.map((x, k) => {
@@ -172,13 +177,15 @@
   // berilmasa — uzunligi); fade — oldingi kadrdan shuncha soniyada erib o'tish; push — rasm sekin yaqinlashishi;
   // look — kiyim (LOOKS dagi tartib raqami), shu bo'laklarda o'ngda kartochka chiqadi;
   // keys — [skroll ulushi, video soniyasi] nuqtalari: xira joy skrollda tez o'tib ketadi, tiniq joy uzoqroq turadi.
+  // model videosi: ilgichdan erib o'tayotganda (fade 1 / w 8) yuzi bilan turadi, keyin skroll bilan bir aylanadi
+  const TURN = [[0, 0], [0.125, 0], [1, 5]];
   const FILMS = {
     // do'kon tepasidagi dron kadridan (B, 1 s — sekinroq suriladi) boshlanadi; eshikdan kirgach — kiyimlar:
     // har biri avval ilgichda, keyin model shu kiyimda skroll bilan aylanadi
     // C da 2.2–3.5 s — kamera tomlar ustidan o'tadi, chetlarda xira narsalar: skrollning 8% ida o'tadi
     andijon: [{ c: 'B', w: 2.5 }, { c: 'C', keys: [[0, 0], [0.42, 2.2], [0.5, 3.5], [1, 5]] }, { c: 'D' }, { c: 'E' },
-      { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', w: 8, fade: 1, look: 0 },
-      { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', w: 8, fade: 1, look: 1 },
+      { img: 'kiyim/ilgich_LG-014', w: 1.8, fade: 1.2, push: 0.03, look: 0 }, { vid: 'video/orta_LG-014', w: 8, fade: 1, keys: TURN, look: 0 },
+      { img: 'kiyim/ilgich_LG-018', w: 1.8, fade: 1, push: 0.03, look: 1 }, { vid: 'video/orta_LG-018', w: 8, fade: 1, keys: TURN, look: 1 },
       { img: 'kiyim/ilgich_LG-013', w: 1.8, fade: 1, push: 0.03, look: 2 }, { img: 'kiyim/orta_LG-013', w: 3, fade: 1, push: 0.03, look: 2 }],
   };
   const LOOKS = ['LG-014', 'LG-018', 'LG-013'];
@@ -221,6 +228,7 @@
       await once(v, 'seeked');
       // kadr ekranga chiqquncha (yashirin varaqda requestVideoFrameCallback kelmasligi mumkin — 300 ms dan keyin baribir)
       await Promise.race([new Promise(r => v.requestVideoFrameCallback ? v.requestVideoFrameCallback(r) : requestAnimationFrame(r)), sleep(300)]);
+      await Promise.race([new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))), sleep(100)]); // ekranga chiqsin
       if (J !== j) return;
       v.addEventListener('seeked', journeyScrub.run);
       it.v = v;
@@ -252,16 +260,20 @@
     });
 
   // "fade" bo'lsa, bo'lak boshida oldingi kadr (oxirida to'xtagan) ostida biroz kattalashib eriydi.
-  // Rasmlar o'z vaqti davomida sekin yaqinlashadi. Ko'rinmaydigan qatlamlar chizilmaydi (visibility) — tezroq.
+  // Rasmlar o'z vaqti davomida sekin yaqinlashadi. Oldingi bo'lak har doim joriysining ostida ko'rinib turadi —
+  // yangi video kadri hali chizilmagan bo'lsa ham ekran qoraymaydi va pirpiramaydi. Keyingisi shaffof, lekin
+  // chiziladi (kadri tayyor turadi); qolganlari umuman chizilmaydi (visibility) — tezroq.
   function paintFilm() {
     const F = J.film, i = J.cur, f = F[i].fade ? clamp(J.local * F[i].w / F[i].fade) : 1;
     F.forEach((x, k) => {
-      const out = k === i - 1 && f < 1, o = k === i ? f : out ? 1 : 0;
+      const out = k === i - 1 && f < 1, o = k === i ? f : k === i - 1 ? 1 : 0;
       x.el.style.opacity = o.toFixed(3);
-      x.el.style.visibility = o > 0 ? 'visible' : 'hidden';
+      x.el.style.visibility = k >= i - 1 && k <= i + 1 ? 'visible' : 'hidden';
       const push = x.v ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
       x.el.style.transform = `scale(${(push * (out ? lerp(1, 1.06, f) : 1)).toFixed(4)})`;
     });
+    if (J.poster) { const p = J.poster; J.poster = null; requestAnimationFrame(() => requestAnimationFrame(() => p.remove())); }
+    if (J.waitFor && J.waitFor.k === i) { J.waitFor.done(); J.waitFor = null; }
     showLook(F[i].look);
   }
 
@@ -273,8 +285,6 @@
     const top = journey.offsetTop, len = journey.offsetHeight - innerHeight;
     return clamp((scrollY - top) / len);
   }
-  // kinoning t (0–1) nuqtasiga skroll
-  const scrollToFilm = t => window.scrollTo({ top: journey.offsetTop + t * (journey.offsetHeight - innerHeight), behavior: reduced ? 'auto' : 'smooth' });
 
   function setLayer(el, opacity, scale, filter = '') {
     if (!el) return;
@@ -376,7 +386,7 @@
   /* ---------- KIYIMLAR (kino ichida) ---------- */
   // Eshikdan kirgach kino kiyim xonasiga o'tadi: har kiyim ilgichda, keyin model shu kiyimda skroll bilan aylanadi
   // (FILMS dagi look). O'ngda — shu kiyimning kartochkasi: narx, tarkibi, razmerlar, buyurtma.
-  const lookCard = $('#lookCard'), lookInfo = $('#lookInfo'), lookCount = $('#lookCount'), lookThumbs = $('#lookThumbs');
+  const lookCard = $('#lookCard'), lookInfo = $('#lookInfo'), lookId = $('#lookId'), lookCount = $('#lookCount'), lookThumbs = $('#lookThumbs');
   lookThumbs.innerHTML = LOOKS.map((id, i) =>
     `<button type="button" data-i="${i}" aria-label="${id}"><img src="assets/kiyim/ilgich_${id}.jpg" alt="" loading="lazy"></button>`).join('');
 
@@ -387,16 +397,34 @@
     if (J.look < 0) return;
     const p = PRODUCTS.find(x => x.id === LOOKS[J.look]);
     lookCount.textContent = `0${J.look + 1} / 0${LOOKS.length}`;
-    lookInfo.innerHTML = p ? `<span class="id">${p.id} · ${esc(CAT[p.kategoriya] || p.kategoriya)}</span><h3>${esc(p.nomi)}</h3>
+    lookId.textContent = p ? ap(`${p.id} · ${CAT[p.kategoriya] || p.kategoriya}`) : '';
+    lookInfo.innerHTML = p ? `<h3>${esc(p.nomi)}</h3>
       <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>${partsHtml(p)}${sizesHtml(p)}
       <a class="btn" href="${orderLink(J.st)}">Buyurtma berish</a>` : '';
     lookThumbs.querySelectorAll('button').forEach((b, k) => b.classList.toggle('on', k === J.look));
   }
-  // kiyimga o'tish — kinoning o'sha joyiga skroll (ilgich to'liq ko'ringan nuqta)
-  function goLook(i) {
-    if (!J || !J.film) return;
-    const it = J.film.find(x => x.look === (i + LOOKS.length) % LOOKS.length);
-    if (it) scrollToFilm((it.at + it.fade) / J.total + 0.001);
+  // Kiyimga o'tish: video oraliq kadrlardan "aylanib" o'tmaydi — qisqa parda ostida darhol o'sha kiyimga.
+  // Model ko'rinib turgan bo'lsa — keyingi kiyimdagi modelga (yuzi bilan), ilgichda bo'lsa — keyingi ilgichga.
+  const veil = $('#veil');
+  let going = false;
+  async function goLook(i) {
+    if (!J || !J.film || going) return;
+    const look = (i + LOOKS.length) % LOOKS.length, cur = J.film[J.cur];
+    const onModel = !!cur && cur.look != null && J.film.find(x => x.look === cur.look) !== cur;
+    const items = J.film.filter(x => x.look === look), it = items[onModel ? items.length - 1 : 0];
+    if (!it) return;
+    going = true;
+    veil.classList.add('on');
+    await sleep(reduced ? 0 : 200);
+    const shown = new Promise(done => { J.waitFor = { k: J.film.indexOf(it), done }; });
+    const t = (it.at + it.fade) / J.total + 0.0005;
+    window.scrollTo({ top: journey.offsetTop + t * (journey.offsetHeight - innerHeight), behavior: 'auto' });
+    journeyScrub.target = journeyProgress(); journeyScrub.jump();
+    render();
+    await Promise.race([shown, sleep(1200)]); // yangi kadr chizilguncha parda turadi
+    await sleep(60);
+    veil.classList.remove('on');
+    going = false;
   }
   lookThumbs.addEventListener('click', e => { const b = e.target.closest('button'); if (b) goLook(+b.dataset.i); });
   $('#lookPrev').addEventListener('click', () => goLook(J.look - 1));
