@@ -135,7 +135,8 @@
     // yetishmasa — A dan boshlab ketma-ket bor kliplar (kamida A–D). Avval faqat videolarning boshi (metadata,
     // bir necha KB) olinadi — kino darhol tayyor; to'liq fayllar keyin navbat bilan yuklanadi (preloadFilm).
     // Telefonda klipning kadrlari (WebP) bo'lsa — video o'rniga ular (frameSeq), bo'lmasa video.
-    const url = x => x.c ? `assets/video/${key}_${x.c}${M}.mp4` : x.vid ? `assets/${x.vid}${M}.mp4` : `assets/${x.img}.jpg`;
+    // kiyim rasmlarining telefon nusxasi (_m) — kiyim/model markazidan kesilgan, videolar bilan bir xil joyda
+    const url = x => x.c ? `assets/video/${key}_${x.c}${M}.mp4` : x.vid ? `assets/${x.vid}${M}.mp4` : `assets/${x.img}${x.img.startsWith('kiyim/') ? M : ''}.jpg`;
     const kadr = await KADR, clipName = x => x.c ? `${key}_${x.c}` : x.vid.split('/').pop();
     const load = x => x.c || x.vid
       ? (kadr[clipName(x)] ? frameSeq(clipName(x), kadr[clipName(x)]) : Promise.resolve(null)).then(q => q || videoMeta(url(x)))
@@ -567,7 +568,7 @@
   // (FILMS dagi look). O'ngda — shu kiyimning kartochkasi: narx, tarkibi, razmerlar, buyurtma.
   const lookCard = $('#lookCard'), lookInfo = $('#lookInfo'), lookId = $('#lookId'), lookCount = $('#lookCount'), lookThumbs = $('#lookThumbs');
   lookThumbs.innerHTML = LOOKS.map((id, i) =>
-    `<button type="button" data-i="${i}" aria-label="${id}"><img src="assets/kiyim/ilgich_${id}.jpg" alt="" loading="lazy"></button>`).join('');
+    `<button type="button" data-i="${i}" aria-label="${id}"><img src="assets/kiyim/ilgich_${id}${M}.jpg" alt="" loading="lazy"></button>`).join('');
 
   function showLook(i) {
     if (!J || i === J.look) return;
