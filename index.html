@@ -10,35 +10,27 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Kaushan+Script&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-<!-- Andijon kinosining birinchi klipi (1.8 MB) bo'sh vaqtda oldindan — karta bosilganda darhol boshlansin -->
-<link rel="prefetch" href="assets/video/andijon_B.mp4">
+<!-- sayt Andijon kinosining birinchi kadri bilan ochiladi — video kelguncha shu rasm -->
+<link rel="preload" as="image" href="assets/video/andijon_boshi.jpg">
 </head>
 <body>
 
 <header class="nav" id="nav">
-  <a class="brand" href="#top" aria-label="Legenda — bosh sahifa">
+  <a class="brand" href="#journey" aria-label="Legenda — bosh sahifa">
     <svg viewBox="0 0 40 30" aria-hidden="true"><path d="M20 4a3.2 3.2 0 1 1 3.2 3.2c-1.2 0-3.2.8-3.2 2.6v1.6L37 24H3l17-12.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>
     <span>LEGENDA</span>
   </a>
   <nav>
-    <a href="#top">Filiallar</a>
+    <a href="#aloqa" id="navBranches">Filiallar</a>
     <a href="#journey" id="navTry" hidden>Kiyib ko'rish</a>
     <a href="#katalog" id="navCatalog" hidden>Katalog</a>
     <a href="#aloqa">Aloqa</a>
   </nav>
 </header>
 
-<!-- 1. BOSH SAHIFA: 3 ta filial (Higgsfield yasagan shahar rasmlari), bosilsa — do'konga safar -->
-<section class="start" id="top" aria-label="Filialni tanlang">
-  <div class="start-head">
-    <span class="kicker">Erkaklar kiyim do'konlari · Farg'ona vodiysi</span>
-    <h1>Qaysi filialga <em>kiramiz?</em></h1>
-  </div>
-  <div class="cities" id="cities"></div>
-</section>
-
-<!-- 2. DO'KONGA KIRISH: skroll videoni (yoki kadrlarni) suradi; eshikdan keyin — kiyimlar (model skroll bilan aylanadi) -->
-<section class="journey" id="journey" hidden aria-label="Do'konga kirish">
+<!-- 1. DO'KONGA KIRISH: sayt shu bilan ochiladi (Andijon — do'kon tepasidagi dron kadridan). Skroll videoni (yoki
+     kadrlarni) suradi; eshikdan keyin — kiyimlar (model skroll bilan aylanadi) -->
+<section class="journey" id="journey" aria-label="Do'konga kirish">
   <div class="stage" id="stage">
     <div class="layers" id="layers"></div>
     <div class="ov ov-day" id="ovDay"></div>
@@ -61,11 +53,11 @@
         <button type="button" class="arrow" id="lookNext" aria-label="Keyingi kiyim">→</button>
       </div>
     </aside>
-    <button class="back" id="back" type="button">← Filiallar</button>
+    <nav class="switch" id="switch" aria-label="Filiallar"></nav>
   </div>
 </section>
 
-<!-- 3. TANLANGAN DO'KON KATALOGI -->
+<!-- 2. TANLANGAN DO'KON KATALOGI -->
 <section class="catalog" id="katalog" hidden>
   <div class="cat-head">
     <div>
@@ -78,7 +70,7 @@
   <div class="grid" id="grid"></div>
 </section>
 
-<!-- 4. ALOQA: uchala filial -->
+<!-- 3. ALOQA: uchala filial -->
 <section class="contacts" id="aloqa">
   <span class="kicker">ALOQA</span>
   <h2>Uchta filial — <em>bitta Legenda</em></h2>
