@@ -15,8 +15,11 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: auto; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+/* sahifa foni — kino rangi (qorong'i): Safari tepa va pastki panelini sahifa fonidan bo'yaydi (Safari 26 da
+   theme-color o'rniga). Krem fon bo'lsa, skrollda panel qora kino ustida oq tasma bo'lib pirpiraydi.
+   Krem — faqat katalog bo'limida (.catalog). */
+html { scroll-behavior: auto; background: #0d0b0a; }
+body { margin: 0; background: #0d0b0a; color: var(--ink); font: 16px/1.55 var(--sans); -webkit-font-smoothing: antialiased; overflow-x: hidden; }
 img, video, svg { display: block; }
 ::selection { background: var(--accent-soft); color: var(--ink); }
 html { scrollbar-color: rgba(181, 132, 79, .55) transparent; scrollbar-width: thin; }
@@ -117,7 +120,7 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .thumbs img { width: 100%; height: 100%; object-fit: cover; object-position: 33% 45%; transform: scale(1.5); }
 
 /* ---------- CATALOG ---------- */
-.catalog { padding: clamp(80px, 12vh, 130px) var(--gutter) 90px; }
+.catalog { padding: clamp(80px, 12vh, 130px) var(--gutter) 90px; background: var(--bg); }
 .catalog[hidden] { display: none; }
 .cat-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .cat-head .kicker { color: var(--accent); }
