@@ -4,6 +4,7 @@ Andijon, Shahrixon va Asakadagi Legenda do'konlari uchun bir sahifali sayt.
 
 - **Intro:** kamera bulutlar orasidan shaharga tushadi, keyin filialni tanlaysiz.
 - **Do'konga kirish:** skroll bilan osmondan fasadga, kun kechga aylanib, do'kon ichiga.
+- **Kiyib ko'rish (Andijon):** bo'y va vazn tanlanadi, shunday gavdali odam kiyimlarni kiyib ko'rsatadi.
 - **Katalog:** tanlangan do'kon mahsulotlari: narx, o'lcham, kategoriya bo'yicha filtr.
 - **Aloqa:** uchala filial manzili va telefoni.
 
@@ -22,7 +23,10 @@ app.js            intro, skroll animatsiyasi, katalog
 assets/data.js    mahsulotlar ro'yxati
 assets/filial/    filial rasmlari
 assets/mahsulot/  mahsulot rasmlari
-assets/video/     Higgsfield videolari (intro.mp4 va do'kon kliplari)
+assets/video/     Higgsfield videolari (intro, do'kon kliplari, kiyib ko'rish)
+assets/kiyim/     kiyib ko'rish rasmlari (har gavda: model + 3 obraz) va fon
 ```
 
-Do'kon kliplari (`assets/video/andijon_A.mp4` … `asaka_D.mp4`) qo'shilsa, sayt rasmli animatsiya o'rniga avtomatik ravishda videolarni o'ynatadi.
+Do'kon kliplari (`assets/video/andijon_A.mp4`, `_B`, `_C` … ketma-ket, kamida A–D) qo'shilsa, sayt rasmli animatsiya
+o'rniga avtomatik ravishda videolarni o'ynatadi. Kiyib ko'rishda `{gavda}_tanlash.mp4` bo'lsa videolar, bo'lmasa
+`assets/kiyim/` dagi rasmlar ko'rsatiladi.

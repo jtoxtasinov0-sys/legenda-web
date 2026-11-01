@@ -247,25 +247,32 @@
 
   // Video skrolldan biroz orqada "suzib" boradi — g'ildirak qadamlari sakramasin.
   // Keyingi seek oldingisi tugagach ('seeked') beriladi: dekoder qancha tez bo'lsa, shuncha tez,
-  // navbat ham tiqilmaydi.
-  let introT = 0, introTarget = 0, introLast = 0, introWait = 0;
-  function scrubIntro() {
-    clearTimeout(introWait);
-    const v = INTRO_VIDEO;
-    if (!v || !v.duration || v.seeking) return;
-    const now = performance.now(), dt = Math.min(0.1, (now - introLast) / 1000);
-    introLast = now;
-    introT += (introTarget - introT) * (1 - Math.exp(-dt / 0.12));
-    if (Math.abs(introTarget - introT) < 0.0004) introT = introTarget;
-    const want = introT * (v.duration - 0.05);
-    if (Math.abs(v.currentTime - want) > 0.004) v.currentTime = want;
-    else if (introT !== introTarget) introWait = setTimeout(scrubIntro, 16);
+  // navbat ham tiqilmaydi. busy() — video hali surilyaptimi; seek(t) — t (0–1) holatga suradi,
+  // seek berilgan bo'lsa true qaytaradi.
+  function scrubber(busy, seek) {
+    const s = { t: 0, target: 0, last: 0, wait: 0 };
+    s.run = () => {
+      clearTimeout(s.wait);
+      if (busy()) return;
+      const now = performance.now(), dt = Math.min(0.1, (now - s.last) / 1000);
+      s.last = now;
+      s.t += (s.target - s.t) * (1 - Math.exp(-dt / 0.12));
+      if (Math.abs(s.target - s.t) < 0.0004) s.t = s.target;
+      if (!seek(s.t) && s.t !== s.target) s.wait = setTimeout(s.run, 16);
+    };
+    // ochilganda boshidan "suzib" kelmasin — darhol skroll turgan kadr
+    s.jump = () => { s.t = s.target; s.last = performance.now(); };
+    return s;
   }
+  const seekTo = (v, want) => Math.abs(v.currentTime - want) > 0.004 && ((v.currentTime = want), true);
+  const introScrub = scrubber(
+    () => !INTRO_VIDEO || !INTRO_VIDEO.duration || INTRO_VIDEO.seeking,
+    t => seekTo(INTRO_VIDEO, t * (INTRO_VIDEO.duration - 0.05)));
 
   function renderIntro() {
     const p = introProgress();
     if (VMODE) {
-      introTarget = p; scrubIntro();
+      introScrub.target = p; introScrub.run();
       introTitle.style.opacity = 1 - ramp(p, 0.03, 0.16);
       introTitle.style.transform = `translateY(${-ramp(p, 0.03, 0.16) * 40}px)`;
     } else {
@@ -296,9 +303,8 @@
   });
 
   // Higgsfield intro.mp4 tayyor bo'lsa — bulut animatsiyasi o'rniga o'sha o'ynaydi
-  function tryVideo(src, timeout = 2500) {
+  function tryVideo(src, timeout = 2500, v = document.createElement('video')) {
     return new Promise(resolve => {
-      const v = document.createElement('video');
       v.muted = true; v.playsInline = true; v.preload = 'auto';
       const done = ok => { clearTimeout(tm); v.onloadeddata = v.onerror = null; resolve(ok ? v : null); };
       const tm = setTimeout(() => done(false), timeout);
@@ -341,7 +347,7 @@
       { k: st.title, h: st.city, s: 'xush kelibsiz' },
       { k: 'Manzil', h: st.street, p: st.landmark === st.street ? st.address : `${st.address} · ${st.landmark}` },
       st.hours ? { k: 'Har kuni ochiq', h: st.hours.replace('har kuni ', ''), s: 'kechqurun ham kutamiz' } : { k: 'Kechki Legenda', h: 'Chiroqlar yondi', s: 'ichkariga marhamat' },
-      { k: 'Ichkarida', h: `${n} ta model`, p: 'Pastga suring — narxlari bilan katalog' },
+      { k: 'Ichkarida', h: `${n} ta model`, p: key === TRY_STORE ? 'Pastga suring — kiyimlarni kiyib ko’ring' : 'Pastga suring — narxlari bilan katalog' },
     ].map(c => {
       const el = document.createElement('div');
       el.className = 'c' + (c.h.length > 14 ? ' long' : '');
@@ -349,18 +355,46 @@
       capEl.appendChild(el);
       return el;
     });
-    J = { key, st, L, caps, videos: null, phases: [0, .24, .45, .72, 1] };
+    J = { key, st, L, caps, videos: null, cur: -1, phases: [0, .24, .45, .72, 1] };
+    journey.style.height = '';
     sizeJourneyMap();
 
-    // Higgsfield kliplari (A–D) bo'lsa — kadrlar o'rniga videolar
-    const vids = await Promise.all(['A', 'B', 'C', 'D'].map(x => tryVideo(`assets/video/${key}_${x}.mp4`)));
-    if (J && J.key === key && vids.every(Boolean)) {
+    // Higgsfield kliplari (A, B, C, ... ketma-ket, kamida A–D) bo'lsa — kadrlar o'rniga videolar
+    const all = await Promise.all([...'ABCDEFG'].map(x => tryVideo(`assets/video/${key}_${x}.mp4`)));
+    const m = all.includes(null) ? all.indexOf(null) : all.length;
+    if (J && J.key === key && m >= 4) {
       Object.values(L).forEach(el => el && el.remove());
-      J.videos = vids.map(v => { const el = layer(''); el.appendChild(v); return el; });
-      J.phases = [0, .25, .5, .75, 1];
+      J.videos = all.slice(0, m).map(v => {
+        const el = layer(''); el.appendChild(v);
+        v.addEventListener('seeked', journeyScrub.run);
+        return el;
+      });
+      // yozuvlar: A–B shahar, C fasad, D kechqurun, E va keyingilari — ichkari
+      J.phases = m > 4 ? [0, 2 / m, 3 / m, 4 / m, 1] : [0, .25, .5, .75, 1];
+      journey.style.height = `${100 + 105 * m}vh`; // har klipga bir xil skroll
+      journeyScrub.target = journeyProgress(); journeyScrub.jump();
       render();
     }
   }
+
+  // Do'kon kliplari intro kabi suriladi: t (0–1) — hamma kliplar bo'ylab bitta uzluksiz vaqt.
+  // Klip almashganda yangisi kerakli kadrga surilib bo'lgach ko'rsatiladi, qo'shnilari esa oldindan
+  // chegara kadrga qo'yiladi (A oxiri = B boshi) — chok ko'rinmaydi.
+  const clipAt = k => J && J.videos && J.videos[k] && J.videos[k].firstChild;
+  const showClip = i => J.videos.forEach((el, k) => (el.style.opacity = k === i ? 1 : 0));
+  const journeyScrub = scrubber(
+    () => { const v = clipAt(Math.max(0, J ? J.cur : 0)); return !v || !v.duration || v.seeking; },
+    t => {
+      const n = J.videos.length, pos = t * n, i = Math.min(n - 1, Math.floor(pos)), v = clipAt(i);
+      const moved = seekTo(v, (pos - i) * (v.duration - 0.05));
+      if (i !== J.cur) {
+        J.cur = i;
+        if (moved) v.addEventListener('seeked', () => J.cur === i && showClip(i), { once: true });
+        else showClip(i);
+        [i - 1, i + 1].forEach(k => { const w = clipAt(k); if (w && w.duration) seekTo(w, k < i ? w.duration - 0.05 : 0); });
+      }
+      return moved;
+    });
 
   function sizeJourneyMap() {
     if (!J || !J.L.map) return;
@@ -384,15 +418,7 @@
   function renderJourney(p) {
     const { L, st, phases: P, caps } = J;
     if (J.videos) {
-      const seg = Math.min(3, Math.floor(p * 4)), local = p * 4 - seg;
-      J.videos.forEach((el, i) => {
-        el.style.opacity = i === seg ? 1 : 0;
-        const v = el.firstChild;
-        if (i === seg && v.duration) {
-          const want = local * (v.duration - 0.05);
-          if (Math.abs(v.currentTime - want) > 0.02) v.currentTime = want;
-        }
-      });
+      journeyScrub.target = p; journeyScrub.run();
       [ovDay, ovNight, ovGlow, ovWarm].forEach(o => (o.style.opacity = 0));
     } else {
       const hasNight = !!L.night;
@@ -442,6 +468,8 @@
 
   const catalog = $('#katalog'), grid = $('#grid'), chips = $('#chips');
   function orderLink(st) { return st.phones.length ? tel(st.phones[0]) : `https://instagram.com/${st.insta}`; }
+  const partsHtml = p => p.tarkibi ? `<ul class="parts">${p.tarkibi.map(t => `<li><span>${esc(t.nomi)}</span><b>${som(t.narx)}</b></li>`).join('')}</ul>` : '';
+  const sizesHtml = p => p.razmerlar ? `<div class="sizes">${p.razmerlar.split(/,\s*/).map(s => `<span>${esc(s)}</span>`).join('')}</div>` : '';
 
   function renderCatalog(key) {
     const st = STORES[key], items = PRODUCTS.filter(p => p.store === key);
@@ -462,8 +490,8 @@
             <span class="id">${p.id}</span>
             <h3>${esc(p.nomi)}</h3>
             <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>
-            ${p.tarkibi ? `<ul class="parts">${p.tarkibi.map(t => `<li><span>${esc(t.nomi)}</span><b>${som(t.narx)}</b></li>`).join('')}</ul>` : ''}
-            ${p.razmerlar ? `<div class="sizes">${p.razmerlar.split(/,\s*/).map(s => `<span>${esc(s)}</span>`).join('')}</div>` : ''}
+            ${partsHtml(p)}
+            ${sizesHtml(p)}
             <a class="btn" href="${orderLink(st)}">Buyurtma berish</a>
           </div>
         </article>`).join('');
@@ -475,6 +503,113 @@
     };
     draw('');
   }
+
+  /* ---------- KIYIB KO'RISH ---------- */
+  // Mehmon bo'y va vaznini tanlaydi → shunday gavdali odam Higgsfield videolarida kiyimlarni kiyib ko'radi:
+  // "tanlash" videosi aylanada o'ynaydi, obraz tanlansa — "lookN" (odam aylanib, o'sha kiyimda to'xtaydi).
+  // Videosi hali yo'q gavda uchun o'sha odamning rasmlari ko'rsatiladi. Odam va kiyimlar — Andijon do'konidan.
+  const TRY_STORE = 'andijon';
+  const BODIES = {
+    ozgin: { name: "Ozg'in", h: 180, w: 65, looks: ['LG-014', 'LG-018', 'LG-013'] },
+    orta: { name: "O'rta", h: 178, w: 80, looks: ['LG-014', 'LG-018', 'LG-013'] },
+    yirik: { name: 'Yirik', h: 182, w: 110, looks: ['LG-014', 'LG-018', 'LG-012'] },
+  };
+  // tana massasi indeksi: namunalar ~20 (ozg'in), ~25 (o'rta), ~33 (yirik) — chegaralar ularning o'rtasida
+  const bodyOf = (h, w) => { const bmi = w / (h / 100) ** 2; return bmi < 22.5 ? 'ozgin' : bmi < 29 ? 'orta' : 'yirik'; };
+  const lookProduct = (key, i) => PRODUCTS.find(p => p.id === BODIES[key].looks[i]);
+
+  const tryEl = $('#kiyim'), tryForm = $('#tryForm'), tryLooks = $('#tryLooks'), looksEl = $('#looks'), lookInfo = $('#lookInfo');
+  const hIn = $('#hIn'), wIn = $('#wIn'), bodiesEl = $('#bodies'), navTry = $('#navTry');
+  const M = { fon: $('#tryFon'), s1: $('#tryS1'), s2: $('#tryS2'), loop: $('#tryLoop'), look: $('#tryLook') };
+  let TB = null; // tanlangan gavda: { key, video, look }
+  // telefonda panel videoning ostida — tugma bosilgach video ekranga qaytariladi
+  const stacked = matchMedia('(max-width: 760px), (max-aspect-ratio: 4 / 5)');
+  const toVideo = () => stacked.matches && tryEl.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth' });
+
+  const showMedia = el => Object.values(M).forEach(x => x.classList.toggle('on', x === el));
+  // rasmdan rasmga silliq o'tish: ikkita <img> navbat bilan
+  function showStill(src) {
+    const el = M.s1.classList.contains('on') ? M.s2 : M.s1, tok = TB;
+    el.src = src;
+    el.decode().catch(() => {}).then(() => {
+      if (TB !== tok) return;
+      showMedia(el); M.loop.pause(); M.look.pause();
+    });
+  }
+
+  bodiesEl.innerHTML = Object.entries(BODIES).map(([k, b]) =>
+    `<button type="button" data-b="${k}"><b>${esc(b.name)}</b><small>${b.h} sm · ${b.w} kg</small></button>`).join('');
+  function syncForm() {
+    [hIn, wIn].forEach(x => x.style.setProperty('--f', ((x.value - x.min) / (x.max - x.min) * 100).toFixed(1) + '%'));
+    $('#hOut').textContent = hIn.value + ' sm';
+    $('#wOut').textContent = wIn.value + ' kg';
+    const b = bodyOf(+hIn.value, +wIn.value);
+    bodiesEl.querySelectorAll('button').forEach(x => x.classList.toggle('on', x.dataset.b === b));
+  }
+  hIn.addEventListener('input', syncForm);
+  wIn.addEventListener('input', syncForm);
+  bodiesEl.addEventListener('click', e => {
+    const x = e.target.closest('button'); if (!x) return;
+    hIn.value = BODIES[x.dataset.b].h; wIn.value = BODIES[x.dataset.b].w;
+    syncForm();
+  });
+  tryForm.addEventListener('submit', e => { e.preventDefault(); chooseBody(bodyOf(+hIn.value, +wIn.value)); toVideo(); });
+  $('#tryBack').addEventListener('click', () => resetTry());
+  looksEl.addEventListener('click', e => { const x = e.target.closest('button'); if (x && TB) { playLook(+x.dataset.i); toVideo(); } });
+  lookInfo.addEventListener('click', e => {
+    if (!e.target.closest('[data-replay]')) return;
+    M.look.currentTime = 0; M.look.play().catch(() => {});
+    toVideo();
+  });
+
+  function resetTry() {
+    TB = null;
+    tryForm.hidden = false; tryLooks.hidden = true;
+    M.loop.pause(); M.look.pause();
+    showMedia(M.fon);
+    syncForm();
+  }
+
+  async function chooseBody(key) {
+    const b = BODIES[key], tok = TB = { key, video: false, look: -1 };
+    tryForm.hidden = true; tryLooks.hidden = false; lookInfo.hidden = true;
+    $('#tryWho').textContent = ap(`${b.name} gavda · ${hIn.value} sm · ${wIn.value} kg`);
+    looksEl.innerHTML = b.looks.map((id, i) => {
+      const p = lookProduct(key, i);
+      return p ? `<button type="button" data-i="${i}"><img src="${p.img}" alt=""><span class="n">${esc(p.nomi)}</span><span class="pr">${som(p.narx)} so’m</span></button>` : '';
+    }).join('');
+    // video yuklanguncha (va har obraz boshida) odamning o'zi ko'rinadi
+    const model = `assets/kiyim/${key}_model.jpg`;
+    M.loop.poster = M.look.poster = model;
+    tok.video = !!(await tryVideo(`assets/video/${key}_tanlash.mp4`, 4000, M.loop));
+    if (TB !== tok || tok.look >= 0) return;
+    if (tok.video) { M.loop.play().catch(() => {}); showMedia(M.loop); }
+    else showStill(model);
+  }
+
+  function playLook(i) {
+    const tok = TB, { key, video } = tok, p = lookProduct(key, i);
+    tok.look = i;
+    looksEl.querySelectorAll('button').forEach(x => x.classList.toggle('on', +x.dataset.i === i));
+    lookInfo.innerHTML = `<span class="id">${p.id} · ${esc(CAT[p.kategoriya] || p.kategoriya)}</span><h3>${esc(p.nomi)}</h3>
+      <div class="price">${som(p.narx)}<small>so’m${p.tarkibi ? ' · jami' : ''}</small></div>${partsHtml(p)}${sizesHtml(p)}
+      <div class="row"><a class="btn light" href="${orderLink(STORES[TRY_STORE])}">Buyurtma berish</a>${video ? '<button class="btn line" type="button" data-replay>↻ Qayta ko’rish</button>' : ''}</div>`;
+    lookInfo.hidden = false;
+    const still = `assets/kiyim/${key}_look${i + 1}.jpg`;
+    if (!video) return showStill(still);
+    const v = M.look;
+    v.src = `assets/video/${key}_look${i + 1}.mp4`;
+    v.play()
+      .then(() => { if (TB === tok && tok.look === i) { showMedia(v); setTimeout(() => M.loop.pause(), 700); } })
+      .catch(() => { if (TB === tok && tok.look === i) showStill(still); });
+  }
+
+  // ekrandan chiqsa videolar to'xtaydi (skroll kinosiga kuch qoladi), qaytsa — davom etadi
+  new IntersectionObserver(([e]) => {
+    const v = [M.loop, M.look].find(x => x.classList.contains('on'));
+    if (!e.isIntersecting) { M.loop.pause(); M.look.pause(); }
+    else if (v && !v.ended) v.play().catch(() => {});
+  }).observe(tryEl);
 
   /* ---------- ALOQA ---------- */
 
@@ -499,6 +634,8 @@
     buildJourney(key);
     renderCatalog(key);
     journey.hidden = false; catalog.hidden = false; navCatalog.hidden = false;
+    tryEl.hidden = navTry.hidden = key !== TRY_STORE;
+    if (!tryEl.hidden) { M.fon.src = `assets/kiyim/fon_${key}.jpg`; resetTry(); }
     history.replaceState(null, '', '#' + key);
     requestAnimationFrame(() => {
       sizeJourneyMap(); render();
@@ -515,9 +652,10 @@
     renderIntro();
     const inJourney = J && !journey.hidden && y >= journey.offsetTop - innerHeight && y <= journey.offsetTop + journey.offsetHeight;
     if (inJourney) renderJourney(journeyProgress());
-    const overJourney = J && !journey.hidden && y >= journey.offsetTop - 60 && y < journey.offsetTop + journey.offsetHeight - innerHeight;
-    nav.classList.toggle('dark', !!overJourney);
-    nav.classList.toggle('solid', !overJourney && y > introEndY() + innerHeight * 0.6);
+    const overJourney = J && !journey.hidden && y >= journey.offsetTop - 60 && y < journey.offsetTop + journey.offsetHeight - 60;
+    const overTry = !tryEl.hidden && y >= tryEl.offsetTop - 60 && y < tryEl.offsetTop + tryEl.offsetHeight - 60;
+    nav.classList.toggle('dark', !!overJourney || overTry);
+    nav.classList.toggle('solid', !overJourney && !overTry && y > introEndY() + innerHeight * 0.6);
   }
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
   addEventListener('resize', () => { placePins(); sizeJourneyMap(); render(); });
@@ -546,10 +684,9 @@
       iv.src = src;
       await new Promise(res => iv.addEventListener('loadeddata', res, { once: true }));
       INTRO_VIDEO = iv;
-      introT = introTarget; // ochilganda boshidan "suzib" kelmasin — darhol skroll turgan kadr
-      introLast = performance.now();
-      iv.addEventListener('seeked', scrubIntro);
-      scrubIntro();
+      introScrub.jump();
+      iv.addEventListener('seeked', introScrub.run);
+      introScrub.run();
     }
   })();
 })();
