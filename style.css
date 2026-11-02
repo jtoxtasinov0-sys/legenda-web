@@ -29,7 +29,8 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 
 /* ---------- NAV ---------- */
 .nav { position: fixed; inset: 0 0 auto 0; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding: 18px var(--gutter); color: #fff; transition: background .4s, color .4s, border-color .4s; border-bottom: 1px solid transparent; }
-.nav.solid { background: rgba(245, 240, 232, .9); color: var(--ink); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-color: var(--line); }
+/* blur yo'q: ostida kino kadrlari har kadrda o'zgaradi — telefonda (ayniqsa iPhone) blur har kadrda qayta hisoblanib qotiradi */
+.nav.solid { background: rgba(245, 240, 232, .97); color: var(--ink); border-color: var(--line); }
 /* video ustida: blur o'rniga yengil gradient — har kadrda qayta hisoblanmaydi (telefonda ham silliq) */
 .nav.dark { background: linear-gradient(180deg, rgba(10, 8, 6, .62), rgba(10, 8, 6, .28) 70%, rgba(10, 8, 6, 0)); color: #fff; }
 .brand { display: flex; align-items: center; gap: 10px; color: inherit; text-decoration: none; font: 800 15px/1 var(--sans); letter-spacing: .38em; }
@@ -46,7 +47,7 @@ em { font-style: normal; font-family: var(--script); color: var(--accent); }
 .layer { will-change: transform, opacity; opacity: 0; }
 /* kino qatlami: .in — rasm/video/kadrlar, .shade — qorayish (parda o'tishida eski kadr ustida) */
 .layer .in { position: absolute; inset: 0; will-change: transform; }
-.layer .shade { position: absolute; inset: 0; background: #120c06; opacity: 0; pointer-events: none; }
+.layer .shade { position: absolute; inset: 0; background: #120c06; opacity: 0; pointer-events: none; display: none; }
 .layer .shade.light { background: #f1e8da; } /* eshikdan kirishda — iliq yorug'lik */
 /* parda o'tishi: yangi kadr pastdan chiqadi — chegarasi kesilgan, ustida yumshoq soya va yupqa oltin chiziq */
 .layer.wipe { overflow: hidden; box-shadow: 0 -28px 70px rgba(18, 12, 6, .38); }

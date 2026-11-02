@@ -15,6 +15,8 @@
   const ap = s => String(s).replace(/'/g, '’');
   const esc = s => ap(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const tel = s => 'tel:' + s.replace(/[^\d+]/g, '');
+  // uslubni faqat qiymati o'zgarganda yozish — skrollda har kadrda o'nlab bir xil yozuv brauzerni ortiqcha ishlatadi
+  const css = (el, prop, v) => { const c = el._css || (el._css = {}); if (c[prop] !== v) { c[prop] = v; el.style[prop] = v; } };
   const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   // tik ekranli telefon: 16:9 videoning faqat o'rtasi ko'rinadi — o'sha qismi kesilgan, ~3 barobar yengil nusxa (_m)
   const PHONE = matchMedia('(max-aspect-ratio: 4 / 5)').matches, M = PHONE ? '_m' : '';
@@ -128,6 +130,7 @@
     (J && J.film || []).forEach(it => it.q && it.q.bm.forEach(drop));
     J = { key, st, L, caps, film: null, cur: -1, look: -1, blobs: [], phases: [0, .24, .45, .72, 1] };
     journey.style.height = '';
+    measure();
     stepsLi[4].hidden = true; // "Kiyimlar" — faqat kinoda kiyimlar bo'lsa
     lookCard.classList.remove('show'); // oldingi filialning kiyim kartochkasi
 
@@ -138,9 +141,11 @@
     // kiyim rasmlarining telefon nusxasi (_m) — kiyim/model markazidan kesilgan, videolar bilan bir xil joyda
     const url = x => x.c ? `assets/video/${key}_${x.c}${M}.mp4` : x.vid ? `assets/${x.vid}${M}.mp4` : `assets/${x.img}${x.img.startsWith('kiyim/') ? M : ''}.jpg`;
     const kadr = await KADR, clipName = x => x.c ? `${key}_${x.c}` : x.vid.split('/').pop();
+    // kiyim rasmlari (kino oxirida) kinoni ochishni kutdirmaydi — fonda, past ustuvorlik bilan yuklanadi
+    const lazyImg = src => Object.assign(new Image(), { decoding: 'async', fetchPriority: 'low', alt: '', src });
     const load = x => x.c || x.vid
       ? (kadr[clipName(x)] ? frameSeq(clipName(x), kadr[clipName(x)]) : Promise.resolve(null)).then(q => q || videoMeta(url(x)))
-      : loadImg(url(x));
+      : FILMS[key] ? lazyImg(url(x)) : loadImg(url(x));
     let plan = FILMS[key], media = plan && await Promise.all(plan.map(load));
     if (!media || media.includes(null)) {
       plan = [...'ABCDEFG'].map(c => ({ c }));
@@ -164,7 +169,7 @@
       inner.appendChild(q ? q.canvas : m);
       if (x.look != null) el.classList.add('try');
       // aylanish videosi ustida uning Start = End kadri (2K rasm): model yuzi bilan turganda tiniq rasm ko'rinadi
-      const still = x.still ? inner.appendChild(Object.assign(new Image(), { className: 'still', alt: '', src: `assets/${x.still}${M}.jpg` })) : null;
+      const still = x.still ? inner.appendChild(Object.assign(new Image(), { className: 'still', alt: '', decoding: 'async', fetchPriority: 'low', src: `assets/${x.still}${M}.jpg` })) : null;
       const to = v || q ? (v || q).duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
       const it = { c: x.c, look: x.look, el, inner, shade, v, q, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0,
         wipe: !!x.wipe, dip: !!x.dip, push: x.push ?? 0.08, at };
@@ -237,29 +242,42 @@
   // surilmaydi yoki umuman yuklanmaydi — rasm esa hamma joyda bir xil ishlaydi. Ro'yxat: kadrlar.json (skript).
   //
   // Tezlik: kadrni ochish (WebP dekodlash) qimmat — asosiy oqimda telefonda 30–80 ms, skroll qotadi. Shuning uchun
-  // fayllar avval xotiraga (blob) olinadi, keyin joriy joy atrofidagi kadrlar FONDA ochiladi (createImageBitmap,
+  // fayllar avval xotiraga (blob) olinadi, keyin joriy joy atrofidagi kadrlar FONDA ochiladi (decodeBlob,
   // bir vaqtda 2 ta), skroll paytida esa faqat tayyor kadr chiziladi (~0.5 ms). Ochilgan kadr ~3 MB — xotirada
-  // ko'pi bilan FRAME_CACHE tasi turadi: joriy joydan oldinda ~18, orqada ~6 va qo'shni bo'laklar chegarasi.
-  const KADR = PHONE ? fetch('assets/kadr/kadrlar.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
-  const frameUrl = (name, k) => `assets/kadr/${name}/${String(k + 1).padStart(3, '0')}.webp`;
-  const FRAME_CACHE = 32, AHEAD = 18, BEHIND = 6;
+  // ko'pi bilan FRAME_CACHE tasi turadi: joriy joydan oldinda ~14, orqada ~5 va qo'shni bo'laklar chegarasi.
+  // kadrlar.json: { klip: { n, fps, w, h, v } }; v — kadrlar to'plami versiyasi (skript: fayllar xeshi). Kadrlar
+  // brauzerda bir yil saqlanadi (vercel.json), shuning uchun manzilda ?v= — kadrlar yangilansa, manzil ham yangi.
+  const KADR = PHONE ? fetch('assets/kadrlar.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
+  const frameUrl = (name, v, k) => `assets/kadr/${name}/${String(k + 1).padStart(3, '0')}.webp${v ? '?v=' + v : ''}`;
+  const FRAME_CACHE = 28, AHEAD = 14, BEHIND = 5;
   const getBlob = u => fetch(u).then(r => (r.ok ? r.blob() : null)).catch(() => null);
-  // fonda ochish; createImageBitmap yo'q eski brauzerda — Image + decode()
-  const decodeBlob = b => window.createImageBitmap ? createImageBitmap(b) : new Promise((res, rej) => {
-    const im = new Image(), u = URL.createObjectURL(b);
-    im.onload = () => (im.decode ? im.decode() : Promise.resolve()).catch(() => {}).then(() => { URL.revokeObjectURL(u); res(im); });
-    im.onerror = () => { URL.revokeObjectURL(u); rej(new Error('kadr')); };
+  // iPhone/iPad (u yerda hamma brauzer, Telegram ichidagisi ham — WebKit) va Safari'da createImageBitmap(blob)
+  // kadrni asosiy oqimda ochadi — skroll qotadi. U yerda Image.decode() fonda ochadi, createImageBitmap(img) esa
+  // ochilgan kadrdan nusxa oladi (tez). Chrome/Android'da createImageBitmap(blob) o'zi fonda ochadi.
+  // Sinov uchun: ?dekod=img yoki ?dekod=bitmap.
+  const UA = navigator.userAgent, DEKOD = new URLSearchParams(location.search).get('dekod');
+  const WEBKIT = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1)
+    || (/Safari\//.test(UA) && !/Chrome|Chromium|CriOS|Edg|OPR|Android/.test(UA));
+  const VIA_IMG = DEKOD ? DEKOD === 'img' : WEBKIT;
+  async function decodeBlob(b) {
+    if (!VIA_IMG && window.createImageBitmap) return createImageBitmap(b);
+    const u = URL.createObjectURL(b), im = new Image();
+    im.decoding = 'async';
     im.src = u;
-  });
-  const drop = bm => bm && bm.close && bm.close();
+    try {
+      await (im.decode ? im.decode() : new Promise((res, rej) => { im.onload = res; im.onerror = rej; }));
+      return window.createImageBitmap ? await createImageBitmap(im) : im;
+    } finally { URL.revokeObjectURL(u); }
+  }
+  const drop = bm => bm && (bm.close ? bm.close() : bm.removeAttribute && bm.removeAttribute('src'));
   // birinchi va oxirgi kadr darhol (bo'laklar chegarasi shular), qolganlari keyin navbat bilan (loadFrames)
   async function frameSeq(name, m) {
-    const ends = await Promise.all([0, m.n - 1].map(k => getBlob(frameUrl(name, k))));
+    const ends = await Promise.all([0, m.n - 1].map(k => getBlob(frameUrl(name, m.v, k))));
     if (ends.includes(null)) return null;
     const bms = await Promise.all(ends.map(b => decodeBlob(b).catch(() => null)));
     if (bms.includes(null)) { bms.forEach(drop); return null; }
     const canvas = Object.assign(document.createElement('canvas'), { width: m.w, height: m.h });
-    const q = { name, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps,
+    const q = { name, v: m.v, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps,
       blob: [], bm: [], busy: new Set(), shown: -1, want: 0, dir: 1 };
     q.blob[0] = ends[0]; q.blob[m.n - 1] = ends[1];
     q.bm[0] = bms[0]; q.bm[m.n - 1] = bms[1];
@@ -336,20 +354,25 @@
       }, () => { q.busy.delete(k); decoding--; delete q.blob[k]; pumpDecode(); });
     }
   }
-  // Kadr fayllari yuklanishi: avval butun kino bo'ylab har 8-kadr (kino darhol oxirigacha suriladi), keyin joriy
-  // bo'lakdan oldinga qarab qolganlari (har 4-, har 2-, hammasi) — skroll qilinayotgan joy birinchi silliqlashadi.
+  // Kadr fayllari yuklanishi (6 ta parallel): navbatdagisi — joriy joyga eng yaqini (orqadagilar ikki barobar
+  // "uzoqroq"); siyrak kadrlar (har 8-, 4-, 2-) shunga mos ravishda uzoqroqdan ham olinadi. Natija: kino darhol
+  // bir tekis siyrak yuklanadi, siz turgan joydan boshlab esa to'la — skroll qilinayotgan joy birinchi silliqlashadi.
   function loadFrames(j) {
-    const seqs = j.film.filter(it => it.q), lvl = k => (k % 8 ? k % 4 ? k % 2 ? 3 : 2 : 1 : 0);
-    seqs.forEach(it => { it.todo = [...Array(it.q.n).keys()].filter(k => !it.q.blob[k]).sort((a, b) => lvl(a) - lvl(b) || a - b); });
-    const rank = it => { const f = j.film.indexOf(it), c = Math.max(0, j.cur); return f >= c ? f - c : 100 + c - f; };
+    const seqs = j.film.filter(it => it.q), lvl = k => (k % 8 ? k % 4 ? k % 2 ? 3 : 2 : 1 : 0), DIV = [8, 4, 2, 1];
+    seqs.forEach(it => { it.todo = new Set([...Array(it.q.n).keys()].filter(k => !it.q.blob[k])); });
     const pick = () => {
-      const order = seqs.filter(it => it.todo.length).sort((a, b) => rank(a) - rank(b));
-      const it = order.find(x => lvl(x.todo[0]) === 0) || order[0];
-      return it && [it, it.todo.shift()];
+      const c = j.film[Math.max(0, j.cur)], here = c ? c.at + (j.local || 0) * c.w : 0;
+      let best = null, bs = Infinity;
+      for (const it of seqs) for (const k of it.todo) {
+        const d = it.at + (k / (it.q.n - 1)) * it.w - here, sc = (d >= 0 ? d : -2 * d) / DIV[lvl(k)];
+        if (sc < bs) { bs = sc; best = [it, k]; }
+      }
+      if (best) best[0].todo.delete(best[1]);
+      return best;
     };
     const worker = async () => {
       for (let p; J === j && (p = pick());) {
-        const [it, k] = p, b = await getBlob(frameUrl(it.q.name, k));
+        const [it, k] = p, b = await getBlob(frameUrl(it.q.name, it.q.v, k));
         if (J !== j) return;
         if (b) { it.q.blob[k] = b; pumpDecode(); }
       }
@@ -430,10 +453,12 @@
     const F = J.film, i = J.cur, f = F[i].fade ? clamp(J.local * F[i].w / F[i].fade) : 1;
     const wipe = F[i].wipe && f < 1, dip = F[i].dip && f < 1, e = ease(f);
     F.forEach((x, k) => {
+      const near = k >= i - 1 && k <= i + 1;
+      css(x.el, 'visibility', near ? 'visible' : 'hidden');
+      if (!near) return; // ko'rinmaydigan qatlamlarga tegilmaydi — brauzer ularni qayta hisoblamaydi
       const out = k === i - 1 && f < 1;
       const o = k === i ? (wipe ? 1 : dip ? ramp(f, 0.42, 0.95) : f) : k === i - 1 ? 1 : 0;
-      x.el.style.opacity = o.toFixed(3);
-      x.el.style.visibility = k >= i - 1 && k <= i + 1 ? 'visible' : 'hidden';
+      css(x.el, 'opacity', o.toFixed(3));
       const push = x.v || x.q ? 1 : 1 + x.push * (k === i ? J.local : k < i ? 1 : 0);
       let y = 0, iy = 0, sc = push, dark = 0;
       if (k === i && wipe) { y = (1 - e) * 100; iy = -y; sc *= lerp(1.08, 1, e); }
@@ -441,15 +466,17 @@
       else if (k === i && dip) sc *= lerp(1.07, 1, ease(ramp(f, 0.42, 1)));
       else if (out && dip) { sc *= lerp(1, 1.16, ease(ramp(f, 0, 0.6))); dark = ease(ramp(f, 0.12, 0.55)); }
       else if (out) sc *= lerp(1, 1.06, f); // erib o'tish: eski kadr biroz kattalashib so'nadi
-      x.el.style.transform = y ? `translate3d(0, ${y.toFixed(3)}%, 0)` : 'none';
-      x.inner.style.transform = `translate3d(0, ${iy.toFixed(3)}%, 0) scale(${sc.toFixed(4)})`;
-      x.shade.style.opacity = dark.toFixed(3);
+      css(x.el, 'transform', y ? `translate3d(0, ${y.toFixed(3)}%, 0)` : 'none');
+      css(x.inner, 'transform', `translate3d(0, ${iy.toFixed(3)}%, 0) scale(${sc.toFixed(4)})`);
+      // qorayish qatlami faqat o'tish paytida chiziladi (boshqa paytda qatlam bo'sh — GPU xotirasi tejaladi)
+      css(x.shade, 'display', dark > 0 ? 'block' : 'none');
+      if (dark > 0) css(x.shade, 'opacity', dark.toFixed(3));
       if (x.el.classList.contains('wipe') !== (k === i && wipe)) x.el.classList.toggle('wipe');
       // tiniq rasm faqat model deyarli qimirlamaganda (birinchi ~0.2 s va oxirgi ~0.25 s) — keyin video
       if (x.still) {
         const t = k === i ? clipTime(x, J.local) : k < i ? x.to : x.from;
         const s = x.still.naturalWidth ? Math.max(1 - ramp(t, 0.03, 0.2), ramp(t, x.to - 0.25, x.to - 0.04)) : 0;
-        x.still.style.opacity = s.toFixed(3);
+        css(x.still, 'opacity', s.toFixed(3));
       }
     });
     if (J.poster) { const p = J.poster; J.poster = null; requestAnimationFrame(() => requestAnimationFrame(() => p.remove())); }
@@ -460,10 +487,14 @@
   // ~21vh skroll = kinoning 1 soniyasi
   function sizeJourney() {
     if (J && J.film) journey.style.height = `${100 + 21 * J.total}vh`;
+    measure();
   }
+  // kino bo'limining o'rni va bo'yi — o'zgarganda (o'lcham, filial, oyna) o'lchanadi; skroll paytida DOM'dan
+  // o'qilmaydi (o'qish brauzerni uslublarni qayta hisoblashga majbur qiladi)
+  const G = { top: 0, h: 0, ih: innerHeight };
+  function measure() { G.top = journey.offsetTop; G.h = journey.offsetHeight; G.ih = innerHeight; }
   function journeyProgress() {
-    const top = journey.offsetTop, len = journey.offsetHeight - innerHeight;
-    return clamp((scrollY - top) / len);
+    return clamp((scrollY - G.top) / (G.h - G.ih));
   }
 
   function setLayer(el, opacity, scale, filter = '') {
@@ -477,7 +508,7 @@
     const { L, st, phases: P, caps } = J;
     if (J.film) {
       journeyScrub.target = p; journeyScrub.run();
-      [ovDay, ovNight, ovGlow, ovWarm].forEach(o => (o.style.opacity = 0));
+      [ovDay, ovNight, ovGlow, ovWarm].forEach(o => css(o, 'opacity', '0'));
     } else {
       const hasNight = !!L.night;
       // kunduzgi fasad (boshidanoq ko'rinadi, sekin yaqinlashadi), keyin qorong'ilashadi.
@@ -511,14 +542,16 @@
     caps.forEach((el, i) => {
       const a = P[i], b = P[i + 1];
       const o = ramp(p, a + 0.015, a + 0.06) * (b >= 1 ? 1 : 1 - ramp(p, b - 0.06, b - 0.015));
-      el.style.opacity = (i === 0 ? Math.max(o, 1 - ramp(p, b - 0.06, b - 0.015)) : o).toFixed(3);
-      el.style.transform = `translateY(${((1 - o) * 18).toFixed(1)}px)`;
+      css(el, 'opacity', (i === 0 ? Math.max(o, 1 - ramp(p, b - 0.06, b - 0.015)) : o).toFixed(3));
+      css(el, 'transform', `translateY(${((1 - o) * 18).toFixed(1)}px)`);
     });
     let seg = 0;
     while (seg < stepsLi.length - 1 && P[seg + 1] < 1 && p >= P[seg + 1]) seg++;
     stepsLi.forEach((li, i) => li.classList.toggle('on', i === seg));
-    trackFill.style.transform = `scaleX(${p.toFixed(4)})`; // width emas — har kadrda sahifa qayta o'lchanmasin
-    hint.style.opacity = 1 - ramp(p, 0.01, 0.05);
+    css(trackFill, 'transform', `scaleX(${p.toFixed(4)})`); // width emas — har kadrda sahifa qayta o'lchanmasin
+    // "Pastga suring" yo'qolgach — umuman chizilmaydi (cheksiz animatsiyasi ham to'xtaydi)
+    const ho = 1 - ramp(p, 0.01, 0.05);
+    css(hint, 'opacity', ho.toFixed(3)); css(hint, 'display', ho > 0 ? '' : 'none');
     // kiyim xonasi yorug' — pastki yozuvlar qora, chetdagi qoraytirish yo'q
     stage.classList.toggle('light', J.tryAt != null && p >= J.tryAt);
   }
@@ -640,6 +673,7 @@
     switchEl.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.key === key));
     history.replaceState(null, '', '#' + key);
     // kino boshiga darhol (silliq skroll butun kinoni orqaga aylantirib o'tardi)
+    measure();
     window.scrollTo({ top: journey.offsetTop, behavior: 'auto' });
     render();
   }
@@ -648,7 +682,7 @@
   function render() {
     ticking = false;
     // avval hamma o'lchamlar o'qiladi, keyin uslublar yoziladi — brauzer har kadrda sahifani qayta hisoblamaydi
-    const y = scrollY, live = J && !journey.hidden, top = journey.offsetTop, h = journey.offsetHeight;
+    const y = scrollY, live = J && !journey.hidden, top = G.top, h = G.h;
     const jp = live ? journeyProgress() : 0;
     if (live && y >= top - innerHeight && y <= top + h) renderJourney(jp);
     // kino ustida menyu qora, yorug' kiyim xonasi ustida — oddiy
@@ -659,6 +693,7 @@
   }
   addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
   addEventListener('resize', () => { sizeJourney(); render(); });
+  addEventListener('load', () => { measure(); render(); });
 
   // Ishga tushirish: havolada filial bo'lsa (#shahrixon) — o'sha, bo'lmasa Andijon kinosi
   const hash = location.hash.slice(1);
