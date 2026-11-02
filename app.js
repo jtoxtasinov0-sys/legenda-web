@@ -141,8 +141,9 @@
     // kiyim rasmlarining telefon nusxasi (_m) — kiyim/model markazidan kesilgan, videolar bilan bir xil joyda
     const url = x => x.c ? `assets/video/${key}_${x.c}${M}.mp4` : x.vid ? `assets/${x.vid}${M}.mp4` : `assets/${x.img}${x.img.startsWith('kiyim/') ? M : ''}.jpg`;
     const kadr = await KADR, clipName = x => x.c ? `${key}_${x.c}` : x.vid.split('/').pop();
-    // kiyim rasmlari (kino oxirida) kinoni ochishni kutdirmaydi — fonda, past ustuvorlik bilan yuklanadi
-    const lazyImg = src => Object.assign(new Image(), { decoding: 'async', fetchPriority: 'low', alt: '', src });
+    // kiyim rasmlari (kino oxirida) kinoni kutdirmaydi va boshida yuklanmaydi (birinchi kirishda internet kadrlarga
+    // ketsin) — kiyimlarga yaqinlashganda yoki kadrlar tugagach (wakeImages)
+
     const load = x => x.c || x.vid
       ? (kadr[clipName(x)] ? frameSeq(clipName(x), kadr[clipName(x)]) : Promise.resolve(null)).then(q => q || videoMeta(url(x)))
       : FILMS[key] ? lazyImg(url(x)) : loadImg(url(x));
@@ -169,15 +170,16 @@
       inner.appendChild(q ? q.canvas : m);
       if (x.look != null) el.classList.add('try');
       // aylanish videosi ustida uning Start = End kadri (2K rasm): model yuzi bilan turganda tiniq rasm ko'rinadi
-      const still = x.still ? inner.appendChild(Object.assign(new Image(), { className: 'still', alt: '', decoding: 'async', fetchPriority: 'low', src: `assets/${x.still}${M}.jpg` })) : null;
+      const still = x.still ? inner.appendChild(lazyImg(`assets/${x.still}${M}.jpg`, 'still')) : null;
       const to = v || q ? (v || q).duration - 0.05 : 0, keys = x.keys && x.keys.map(([f, s]) => [f, Math.min(s, to)]);
       const it = { c: x.c, look: x.look, el, inner, shade, v, q, still, from: 0, to, keys, w: x.w || to, fade: x.fade || 0,
-        wipe: !!x.wipe, dip: !!x.dip, push: x.push ?? 0.08, at };
+        wipe: !!x.wipe, dip: !!x.dip, push: x.push ?? 0.08, at, pic: m instanceof HTMLImageElement ? m : null };
       if (v) v.addEventListener('seeked', journeyScrub.run);
       at += it.w;
       return it;
     });
     J.film.forEach((it, k) => { const n = J.film[k + 1]; if (n && n.dip) it.shade.classList.add('light'); });
+    if (!J.film.some(it => it.q)) J.film.forEach(wakeItem); // kompyuterda (video) kadrlar yuklovchisi yo'q
     J.total = at;
     // yozuvlar: A–B shahar, C fasad, D kechqurun, E — kirish; keyin kiyimlar (kartochka)
     const atOf = c => { const it = J.film.find(x => x.c === c); return it && it.at / at; };
@@ -226,6 +228,10 @@
   // bo'lak ichidagi o'rin (0–1) → video soniyasi
   const clipTime = (it, local) => it.keys ? warp(it.keys, local) : it.from + local * (it.to - it.from);
   const hasTry = key => !!(FILMS[key] && FILMS[key].some(x => x.look != null));
+  // kechiktirilgan rasm: manzili data-src da, wakeImg chaqirilganda yuklana boshlaydi
+  function lazyImg(src, cls) { const im = new Image(); im.decoding = 'async'; im.alt = ''; if (cls) im.className = cls; im.dataset.src = src; return im; }
+  const wakeImg = im => { if (im && im.dataset.src && !im.getAttribute('src')) im.src = im.dataset.src; };
+  const wakeItem = it => { wakeImg(it.pic); wakeImg(it.still); };
   const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
   // video elementi faqat metadata bilan (uzunligi ma'lum bo'ladi), 10 s ichida kelmasa — null
   const videoMeta = src => new Promise(res => {
@@ -278,7 +284,7 @@
     if (bms.includes(null)) { bms.forEach(drop); return null; }
     const canvas = Object.assign(document.createElement('canvas'), { width: m.w, height: m.h });
     const q = { name, v: m.v, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps,
-      blob: [], bm: [], busy: new Set(), shown: -1, want: 0, dir: 1 };
+      blob: [], bm: [], busy: new Set(), shown: [], key: null, want: 0, pos: 0, rest: true, dir: 1 };
     q.blob[0] = ends[0]; q.blob[m.n - 1] = ends[1];
     q.bm[0] = bms[0]; q.bm[m.n - 1] = bms[1];
     drawFrame(q, 0);
@@ -286,17 +292,37 @@
   }
   // t (soniya) dagi kadr (t berilmasa — oxirgi so'ralgani); u hali ochilmagan bo'lsa — eng yaqin ochilgani
   // (avval orqadagi, ya'ni o'tib kelingan tomondagi), kerakli kadr esa navbatga qo'yiladi
-  function drawFrame(q, t) {
-    const want = t == null ? q.want : clamp(Math.round(t * q.fps), 0, q.n - 1);
+  // Skroll harakatida kadr kasr o'rinda bo'ladi: ikki qo'shni ochilgan kadr (orasi 4 kadrgacha — 12 kadr/s klip
+  // yoki hali yuklanmagan oraliq kadrlar) o'rniga qarab aralashtiriladi — kino silliq yuradi. To'xtaganda (rest)
+  // — eng yaqin bitta kadr, tiniq.
+  function drawFrame(q, t, rest) {
+    const pos = t == null ? q.pos : clamp(t * q.fps, 0, q.n - 1), want = Math.round(pos);
+    if (rest == null) rest = q.rest;
     if (want !== q.want) q.dir = want > q.want ? 1 : -1;
-    q.want = want;
-    let k = -1;
-    for (let d = 0; k < 0 && d < q.n; d++) {
-      const a = want - d * q.dir, b = want + d * q.dir;
-      k = q.bm[a] ? a : q.bm[b] ? b : -1;
+    q.want = want; q.pos = pos; q.rest = rest;
+    let a = -1, b = -1;
+    if (!rest) {
+      const lo = Math.floor(pos), hi = Math.ceil(pos);
+      for (let d = 0; a < 0 && d <= 3; d++) if (q.bm[lo - d]) a = lo - d;
+      for (let d = 0; b < 0 && d <= 3; d++) if (q.bm[hi + d]) b = hi + d;
     }
-    if (k >= 0 && k !== q.shown) { q.ctx.drawImage(q.bm[k], 0, 0, q.canvas.width, q.canvas.height); q.shown = k; }
-    if (k !== want) pumpDecode();
+    const W = q.canvas.width, H = q.canvas.height;
+    if (a >= 0 && b > a) {
+      const f = Math.round((pos - a) / (b - a) * 16) / 16, key = `${a}:${b}:${f}`;
+      if (key !== q.key) {
+        q.ctx.globalAlpha = 1; q.ctx.drawImage(q.bm[a], 0, 0, W, H);
+        if (f > 0) { q.ctx.globalAlpha = f; q.ctx.drawImage(q.bm[b], 0, 0, W, H); q.ctx.globalAlpha = 1; }
+        q.key = key; q.shown = [a, b];
+      }
+    } else {
+      let k = -1;
+      for (let d = 0; k < 0 && d < q.n; d++) {
+        const x = want - d * q.dir, y = want + d * q.dir;
+        k = q.bm[x] ? x : q.bm[y] ? y : -1;
+      }
+      if (k >= 0 && q.key !== k) { q.ctx.drawImage(q.bm[k], 0, 0, W, H); q.key = k; q.shown = [k]; }
+    }
+    if (!q.bm[want]) pumpDecode();
   }
   // Keyingi ochiladigan kadr: joriy bo'lakda kerakli kadrdan harakat tomoniga (bo'lak tugasa — keyingisiga
   // o'tib), biroz orqaga, qo'shni bo'laklarning chegara kadrlari.
@@ -328,12 +354,12 @@
     j.film.forEach((it, f) => it.q && it.q.bm.forEach((bm, k) => bm && all.push([it.q, k, f])));
     if (all.length <= FRAME_CACHE) return;
     const cost = ([q, k, f]) => {
-      if (k === q.shown) return -1;
+      if (q.shown.includes(k)) return -1;
       const d = (k - q.want) * q.dir, far = d < 0 ? -2 * d : d;
       return f === c ? far : Math.abs(f - c) === 1 ? (k === q.want ? 0 : 40 + far) : 1000 + far;
     };
     all.sort((a, b) => cost(b) - cost(a));
-    all.slice(0, all.length - FRAME_CACHE).forEach(([q, k]) => { if (k !== q.shown) { drop(q.bm[k]); delete q.bm[k]; } });
+    all.slice(0, all.length - FRAME_CACHE).forEach(([q, k]) => { if (!q.shown.includes(k)) { drop(q.bm[k]); delete q.bm[k]; } });
   }
   let decoding = 0;
   function pumpDecode() {
@@ -349,7 +375,7 @@
         q.bm[k] = bm;
         evict(j);
         // kerakli kadrga ko'rinib turganidan yaqinroq kadr ochildi — qayta chizilsin
-        if (Math.abs(k - q.want) < Math.abs(q.shown - q.want)) drawFrame(q);
+        if (Math.abs(k - q.pos) <= 4) drawFrame(q); // kerakli joy yaqinida yangi kadr — qayta chizilsin
         pumpDecode();
       }, () => { q.busy.delete(k); decoding--; delete q.blob[k]; pumpDecode(); });
     }
@@ -370,12 +396,14 @@
       if (best) best[0].todo.delete(best[1]);
       return best;
     };
+    let busy = 6;
     const worker = async () => {
       for (let p; J === j && (p = pick());) {
         const [it, k] = p, b = await getBlob(frameUrl(it.q.name, it.q.v, k));
         if (J !== j) return;
         if (b) { it.q.blob[k] = b; pumpDecode(); }
       }
+      if (--busy === 0 && J === j) j.film.forEach(wakeItem); // hamma kadr keldi — endi kiyim rasmlari
     };
     for (let w = 0; w < 6; w++) worker();
   }
@@ -423,14 +451,14 @@
       const it = F[i];
       J.local = clamp((pos - it.at) / it.w);
       // kadrlar (telefon) darhol chiziladi — "seeked" kutilmaydi
-      if (it.q) drawFrame(it.q, clipTime(it, J.local));
+      if (it.q) drawFrame(it.q, clipTime(it, J.local), journeyScrub.t === journeyScrub.target);
       const moved = !!it.v && seekTo(it.v, clipTime(it, J.local));
       if (i !== J.cur) {
         J.cur = i; J.ready = !moved;
         if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
         [i - 1, i + 1].forEach(k => {
           const n = F[k], t = n && (k < i ? n.to : n.from);
-          if (n && n.q) drawFrame(n.q, t);
+          if (n && n.q) drawFrame(n.q, t, true);
           else if (n && n.v && n.v.duration) seekTo(n.v, t);
         });
       }
@@ -452,6 +480,7 @@
   function paintFilm() {
     const F = J.film, i = J.cur, f = F[i].fade ? clamp(J.local * F[i].w / F[i].fade) : 1;
     const wipe = F[i].wipe && f < 1, dip = F[i].dip && f < 1, e = ease(f);
+    for (let k = Math.max(0, i - 1); k <= Math.min(F.length - 1, i + 3); k++) wakeItem(F[k]); // yaqinlashganda yuklansin
     F.forEach((x, k) => {
       const near = k >= i - 1 && k <= i + 1;
       css(x.el, 'visibility', near ? 'visible' : 'hidden');
@@ -601,13 +630,14 @@
   // (FILMS dagi look). O'ngda — shu kiyimning kartochkasi: narx, tarkibi, razmerlar, buyurtma.
   const lookCard = $('#lookCard'), lookInfo = $('#lookInfo'), lookId = $('#lookId'), lookCount = $('#lookCount'), lookThumbs = $('#lookThumbs');
   lookThumbs.innerHTML = LOOKS.map((id, i) =>
-    `<button type="button" data-i="${i}" aria-label="${id}"><img src="assets/kiyim/ilgich_${id}${M}.jpg" alt="" loading="lazy"></button>`).join('');
+    `<button type="button" data-i="${i}" aria-label="${id}"><img data-src="assets/kiyim/ilgich_${id}${M}.jpg" alt="" decoding="async"></button>`).join('');
 
   function showLook(i) {
     if (!J || i === J.look) return;
     J.look = i ?? -1;
     lookCard.classList.toggle('show', J.look >= 0);
     if (J.look < 0) return;
+    lookThumbs.querySelectorAll('img').forEach(wakeImg); // kartochka birinchi chiqqanda yuklanadi
     const p = PRODUCTS.find(x => x.id === LOOKS[J.look]);
     lookCount.textContent = `0${J.look + 1} / 0${LOOKS.length}`;
     lookId.textContent = p ? ap(`${p.id} · ${CAT[p.kategoriya] || p.kategoriya}`) : '';
