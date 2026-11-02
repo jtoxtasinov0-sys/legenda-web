@@ -127,7 +127,7 @@
       return el;
     });
     (J && J.blobs || []).forEach(u => URL.revokeObjectURL(u));
-    (J && J.film || []).forEach(it => it.q && it.q.bm.forEach(drop));
+    (J && J.film || []).forEach(it => it.q && ['H', 'L'].forEach(T => it.q[T] && it.q[T].bm.forEach(drop)));
     J = { key, st, L, caps, film: null, cur: -1, look: -1, blobs: [], phases: [0, .24, .45, .72, 1] };
     journey.style.height = '';
     measure();
@@ -250,12 +250,16 @@
   // Tezlik: kadrni ochish (WebP dekodlash) qimmat — asosiy oqimda telefonda 30–80 ms, skroll qotadi. Shuning uchun
   // fayllar avval xotiraga (blob) olinadi, keyin joriy joy atrofidagi kadrlar FONDA ochiladi (decodeBlob,
   // bir vaqtda 2 ta), skroll paytida esa faqat tayyor kadr chiziladi (~0.5 ms). Ochilgan kadr ~3 MB — xotirada
-  // ko'pi bilan FRAME_CACHE tasi turadi: joriy joydan oldinda ~14, orqada ~5 va qo'shni bo'laklar chegarasi.
-  // kadrlar.json: { klip: { n, fps, w, h, v } }; v — kadrlar to'plami versiyasi (skript: fayllar xeshi). Kadrlar
-  // brauzerda bir yil saqlanadi (vercel.json), shuning uchun manzilda ?v= — kadrlar yangilansa, manzil ham yangi.
+  // ko'pi bilan CACHE tasi turadi (to'liq 28, kichik 48): joriy joydan oldinda, biroz orqada va qo'shni bo'laklar chegarasi.
+  // kadrlar.json: { klip: { n, fps, w, h, v, s: { n, w, h, v } } }. v — kadrlar to'plami versiyasi (skript: fayllar
+  // xeshi). Kadrlar brauzerda bir yil saqlanadi (vercel.json), shuning uchun manzilda ?v= — yangilansa, manzil ham yangi.
+  //
+  // Ikki bosqich (birinchi kirishda ham silliq): H — to'liq kadr (720 px, har kadr), L — kichik nusxa (400 px, har
+  // 2-kadr, butun kino ~4 MB). Avval L oldinga uzoqqacha yuklanadi — kino darhol uzluksiz yuradi (tez harakatda kichik
+  // nusxa sezilmaydi); H esa siz turgan joydan — to'xtagan joyning tiniq kadri birinchi keladi va almashadi.
   const KADR = PHONE ? fetch('assets/kadrlar.json').then(r => (r.ok ? r.json() : {})).catch(() => ({})) : Promise.resolve({});
-  const frameUrl = (name, v, k) => `assets/kadr/${name}/${String(k + 1).padStart(3, '0')}.webp${v ? '?v=' + v : ''}`;
-  const FRAME_CACHE = 28, AHEAD = 14, BEHIND = 5;
+  const frameUrl = (name, v, k, small) => `assets/kadr/${name}/${small ? 's/' : ''}${String(k + 1).padStart(3, '0')}.webp${v ? '?v=' + v : ''}`;
+  const CACHE = { H: 28, L: 48 }, AHEAD = 14, BEHIND = 5, L_AHEAD = 28; // oyna xotiradan kichik — qayta-qayta ochilmaydi
   const getBlob = u => fetch(u).then(r => (r.ok ? r.blob() : null)).catch(() => null);
   // iPhone/iPad (u yerda hamma brauzer, Telegram ichidagisi ham — WebKit) va Safari'da createImageBitmap(blob)
   // kadrni asosiy oqimda ochadi — skroll qotadi. U yerda Image.decode() fonda ochadi, createImageBitmap(img) esa
@@ -276,90 +280,102 @@
     } finally { URL.revokeObjectURL(u); }
   }
   const drop = bm => bm && (bm.close ? bm.close() : bm.removeAttribute && bm.removeAttribute('src'));
-  // birinchi va oxirgi kadr darhol (bo'laklar chegarasi shular), qolganlari keyin navbat bilan (loadFrames)
+  const tier = () => ({ blob: [], bm: [], busy: new Set() });
+  // fayl manzili: L — faqat juft kadrlar (k/2-fayl)
+  const tierUrl = (q, T, k) => T === 'H' ? frameUrl(q.name, q.v, k) : frameUrl(q.name, q.sv, k / 2, true);
+  // birinchi va oxirgi to'liq kadr darhol (bo'laklar chegarasi shular), qolganlari keyin navbat bilan (loadFrames)
   async function frameSeq(name, m) {
     const ends = await Promise.all([0, m.n - 1].map(k => getBlob(frameUrl(name, m.v, k))));
     if (ends.includes(null)) return null;
     const bms = await Promise.all(ends.map(b => decodeBlob(b).catch(() => null)));
     if (bms.includes(null)) { bms.forEach(drop); return null; }
     const canvas = Object.assign(document.createElement('canvas'), { width: m.w, height: m.h });
-    const q = { name, v: m.v, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps, duration: m.n / m.fps,
-      blob: [], bm: [], busy: new Set(), shown: [], key: null, want: 0, pos: 0, rest: true, dir: 1 };
-    q.blob[0] = ends[0]; q.blob[m.n - 1] = ends[1];
-    q.bm[0] = bms[0]; q.bm[m.n - 1] = bms[1];
+    const q = { name, v: m.v, sv: m.s && m.s.v, canvas, ctx: canvas.getContext('2d', { alpha: false }), n: m.n, fps: m.fps,
+      duration: m.n / m.fps, H: tier(), L: m.s ? tier() : null, shown: null, want: 0, dir: 1 };
+    q.H.blob[0] = ends[0]; q.H.blob[m.n - 1] = ends[1];
+    q.H.bm[0] = bms[0]; q.H.bm[m.n - 1] = bms[1];
     drawFrame(q, 0);
     return q;
   }
-  // t (soniya) dagi kadr (t berilmasa — oxirgi so'ralgani); u hali ochilmagan bo'lsa — eng yaqin ochilgani
-  // (avval orqadagi, ya'ni o'tib kelingan tomondagi), kerakli kadr esa navbatga qo'yiladi
-  // Skroll harakatida kadr kasr o'rinda bo'ladi: ikki qo'shni ochilgan kadr (orasi 4 kadrgacha — 12 kadr/s klip
-  // yoki hali yuklanmagan oraliq kadrlar) o'rniga qarab aralashtiriladi — kino silliq yuradi. To'xtaganda (rest)
-  // — eng yaqin bitta kadr, tiniq.
-  function drawFrame(q, t, rest) {
-    const pos = t == null ? q.pos : clamp(t * q.fps, 0, q.n - 1), want = Math.round(pos);
-    if (rest == null) rest = q.rest;
+  // t (soniya) dagi kadr — doim bitta (aralashtirish yo'q: tez skrollda "arvoh" bo'lardi). Afzali: shu joyning to'liq
+  // kadri; bo'lmasa — eng yaqin ochilgani (avval o'tib kelingan tomondagi), bir xil masofada to'liq kadr kichikdan oldin.
+  function drawFrame(q, t) {
+    const want = t == null ? q.want : clamp(Math.round(t * q.fps), 0, q.n - 1);
     if (want !== q.want) q.dir = want > q.want ? 1 : -1;
-    q.want = want; q.pos = pos; q.rest = rest;
-    let a = -1, b = -1;
-    if (!rest) {
-      const lo = Math.floor(pos), hi = Math.ceil(pos);
-      for (let d = 0; a < 0 && d <= 3; d++) if (q.bm[lo - d]) a = lo - d;
-      for (let d = 0; b < 0 && d <= 3; d++) if (q.bm[hi + d]) b = hi + d;
-    }
-    const W = q.canvas.width, H = q.canvas.height;
-    if (a >= 0 && b > a) {
-      const f = Math.round((pos - a) / (b - a) * 16) / 16, key = `${a}:${b}:${f}`;
-      if (key !== q.key) {
-        q.ctx.globalAlpha = 1; q.ctx.drawImage(q.bm[a], 0, 0, W, H);
-        if (f > 0) { q.ctx.globalAlpha = f; q.ctx.drawImage(q.bm[b], 0, 0, W, H); q.ctx.globalAlpha = 1; }
-        q.key = key; q.shown = [a, b];
+    q.want = want;
+    let T = null, k = -1;
+    for (let d = 0; k < 0 && d < q.n; d++) {
+      for (const x of [want - d * q.dir, want + d * q.dir]) {
+        if (q.H.bm[x]) { T = 'H'; k = x; break; }
+        if (q.L && q.L.bm[x]) { T = 'L'; k = x; break; }
       }
-    } else {
-      let k = -1;
-      for (let d = 0; k < 0 && d < q.n; d++) {
-        const x = want - d * q.dir, y = want + d * q.dir;
-        k = q.bm[x] ? x : q.bm[y] ? y : -1;
-      }
-      if (k >= 0 && q.key !== k) { q.ctx.drawImage(q.bm[k], 0, 0, W, H); q.key = k; q.shown = [k]; }
     }
-    if (!q.bm[want]) pumpDecode();
+    if (k >= 0 && !(q.shown && q.shown.T === T && q.shown.k === k)) {
+      q.ctx.drawImage(q[T].bm[k], 0, 0, q.canvas.width, q.canvas.height);
+      q.shown = { T, k };
+    }
+    if (!(T === 'H' && k === want)) pumpDecode();
   }
-  // Keyingi ochiladigan kadr: joriy bo'lakda kerakli kadrdan harakat tomoniga (bo'lak tugasa — keyingisiga
-  // o'tib), biroz orqaga, qo'shni bo'laklarning chegara kadrlari.
+  // Fokus — kerakli kadr (yoki u hali kelmagan bo'lsa — unga eng yaqin kelgan) — ochish shu atrofda: birinchi
+  // kirishda ham kelgan kadrlar darhol ochilib, kino muzlab turmaydi.
+  function focusOf(q, T) {
+    const t = q[T], w = q.want;
+    for (let d = 0; d < q.n; d++) for (const x of [w - d * q.dir, w + d * q.dir]) if (t.blob[x]) return x;
+    return w;
+  }
+  // Keyingi ochiladigan kadr: 1) shu joyning to'liq kadri, 2) kichik nusxa oldinga uzoqqacha (bo'lak tugasa —
+  // keyingisiga o'tib), 3) qo'shni bo'laklar chegarasi, 4) to'liq kadrlar oldinga/orqaga.
   function nextDecode(j) {
-    const F = j.film, cur = F[Math.max(0, j.cur)], list = [];
-    const add = (it, k) => { if (it && it.q && k >= 0 && k < it.q.n) list.push([it.q, k]); };
+    const F = j.film, ci = Math.max(0, j.cur), cur = F[ci], list = [];
+    const add = (T, k) => {
+      let i = ci;
+      while (F[i] && F[i].q && k >= F[i].q.n) { k -= F[i].q.n; i++; }
+      while (F[i] && F[i].q && k < 0) { i--; if (F[i] && F[i].q) k += F[i].q.n; }
+      const q = F[i] && F[i].q;
+      if (!q || !q[T] || k < 0 || k >= q.n) return;
+      if (T === 'L') k -= k % 2;
+      list.push([q, T, k]);
+    };
+    const edge = () => {
+      if (F[ci - 1] && F[ci - 1].q) list.push([F[ci - 1].q, 'H', F[ci - 1].q.n - 1]);
+      if (F[ci + 1] && F[ci + 1].q) list.push([F[ci + 1].q, 'H', 0]);
+    };
     if (cur && cur.q) {
-      const q = cur.q, i = F.indexOf(cur), step = (from, d, n) => {
-        for (let s = from; s <= n; s++) {
-          const k = q.want + s * d;
-          if (k >= 0 && k < q.n) add(cur, k);
-          else { const nb = F[i + d]; add(nb, d > 0 ? k - q.n : nb && nb.q ? nb.q.n + k : -1); }
-        }
-      };
-      step(0, q.dir, 5); step(1, -q.dir, 2);
-      add(F[i - 1], F[i - 1] && F[i - 1].q ? F[i - 1].q.n - 1 : -1); add(F[i + 1], 0);
-      step(6, q.dir, AHEAD); step(3, -q.dir, BEHIND);
+      const q = cur.q, d = q.dir, fh = focusOf(q, 'H'), fl = q.L ? focusOf(q, 'L') : 0;
+      add('H', q.want);
+      if (q.L) { for (let s = 0; s <= L_AHEAD; s += 2) add('L', fl + s * d); add('L', fl - 2 * d); add('L', fl - 4 * d); }
+      edge();
+      for (let s = 0; s <= AHEAD; s++) add('H', fh + s * d);
+      for (let s = 1; s <= BEHIND; s++) add('H', fh - s * d);
     } else if (cur) {
-      const i = F.indexOf(cur);
-      add(F[i - 1], F[i - 1] && F[i - 1].q ? F[i - 1].q.n - 1 : -1); add(F[i + 1], 0);
-      for (let k = 1; k < AHEAD; k++) add(F[i + 1], k);
+      edge();
+      const n = F[ci + 1] && F[ci + 1].q;
+      if (n) { if (n.L) for (let k = 0; k < L_AHEAD; k += 2) list.push([n, 'L', k]); for (let k = 1; k < AHEAD; k++) list.push([n, 'H', k]); }
     }
-    return list.find(([q, k]) => q.blob[k] && !q.bm[k] && !q.busy.has(k));
+    // kichik nusxa faqat to'liq kadr hali kelmagan joyda kerak (ikkinchi kirishda — umuman ochilmaydi)
+    return list.find(([q, T, k]) => { const t = q[T]; return t.blob[k] && !t.bm[k] && !t.busy.has(k) && !(T === 'L' && q.H.blob[k]); });
   }
-  // Xotira chegarasi: kerakli joydan eng uzoq (orqadagilar ikki barobar "uzoqroq") va qo'shni bo'lmagan
+  // Xotira chegarasi (H va L alohida): joriy joydan eng uzoq (orqadagilar ikki barobar "uzoqroq") va qo'shni bo'lmagan
   // bo'laklarning kadrlari yopiladi. Ko'rinib turgan kadr yopilmaydi.
   function evict(j) {
-    const all = [], c = Math.max(0, j.cur);
-    j.film.forEach((it, f) => it.q && it.q.bm.forEach((bm, k) => bm && all.push([it.q, k, f])));
-    if (all.length <= FRAME_CACHE) return;
-    const cost = ([q, k, f]) => {
-      if (q.shown.includes(k)) return -1;
-      const d = (k - q.want) * q.dir, far = d < 0 ? -2 * d : d;
-      return f === c ? far : Math.abs(f - c) === 1 ? (k === q.want ? 0 : 40 + far) : 1000 + far;
-    };
-    all.sort((a, b) => cost(b) - cost(a));
-    all.slice(0, all.length - FRAME_CACHE).forEach(([q, k]) => { if (!q.shown.includes(k)) { drop(q.bm[k]); delete q.bm[k]; } });
+    const c = Math.max(0, j.cur);
+    for (const T of ['H', 'L']) {
+      const all = [];
+      j.film.forEach((it, f) => it.q && it.q[T] && it.q[T].bm.forEach((bm, k) => bm && all.push([it.q, k, f])));
+      if (all.length <= CACHE[T]) continue;
+      const fo = new Map(); // joriy bo'lakda masofa fokusdan (kelgan kadrlar atrofi) — ochilgani darhol yopilmasin
+      const cost = ([q, k, f]) => {
+        if (q.shown && q.shown.T === T && q.shown.k === k) return -1;
+        if (f === c && !fo.has(q)) fo.set(q, focusOf(q, T));
+        const dd = (k - (f === c ? fo.get(q) : q.want)) * q.dir, far = dd < 0 ? -2 * dd : dd;
+        return f === c ? far : Math.abs(f - c) === 1 ? (T === 'H' && (k === 0 || k === q.n - 1) ? 0 : 60 + far) : 1000 + far;
+      };
+      all.sort((a, b) => cost(b) - cost(a));
+      all.slice(0, all.length - CACHE[T]).forEach(([q, k]) => {
+        if (q.shown && q.shown.T === T && q.shown.k === k) return;
+        drop(q[T].bm[k]); delete q[T].bm[k];
+      });
+    }
   }
   let decoding = 0;
   function pumpDecode() {
@@ -367,45 +383,59 @@
     while (j && j.film && decoding < 2) {
       const job = nextDecode(j);
       if (!job) return;
-      const [q, k] = job;
-      q.busy.add(k); decoding++;
-      decodeBlob(q.blob[k]).then(bm => {
-        q.busy.delete(k); decoding--;
+      const [q, T, k] = job, t = q[T];
+      t.busy.add(k); decoding++;
+      decodeBlob(t.blob[k]).then(bm => {
+        t.busy.delete(k); decoding--;
         if (J !== j) { drop(bm); return; }
-        q.bm[k] = bm;
+        t.bm[k] = bm;
         evict(j);
-        // kerakli kadrga ko'rinib turganidan yaqinroq kadr ochildi — qayta chizilsin
-        if (Math.abs(k - q.pos) <= 4) drawFrame(q); // kerakli joy yaqinida yangi kadr — qayta chizilsin
+        if (Math.abs(k - q.want) < 6) drawFrame(q); // kerakli joy yaqinida yangi kadr — yaxshirog'i bo'lsa almashadi
         pumpDecode();
-      }, () => { q.busy.delete(k); decoding--; delete q.blob[k]; pumpDecode(); });
+      }, () => { t.busy.delete(k); decoding--; delete t.blob[k]; pumpDecode(); });
     }
   }
-  // Kadr fayllari yuklanishi (6 ta parallel): navbatdagisi — joriy joyga eng yaqini (orqadagilar ikki barobar
-  // "uzoqroq"); siyrak kadrlar (har 8-, 4-, 2-) shunga mos ravishda uzoqroqdan ham olinadi. Natija: kino darhol
-  // bir tekis siyrak yuklanadi, siz turgan joydan boshlab esa to'la — skroll qilinayotgan joy birinchi silliqlashadi.
+  // Kadr fayllari yuklanishi (8 ta parallel). Navbatdagisi — eng kichik "narx": joriy joydan masofa (orqadagisi ikki
+  // barobar), kichik nusxa (L) uchun ~16 barobar arzon — butun kinoning kichik nusxasi (~4 MB) oldinga uzoqqacha
+  // birinchi keladi; shu joyning to'liq kadri — eng birinchi.
   function loadFrames(j) {
-    const seqs = j.film.filter(it => it.q), lvl = k => (k % 8 ? k % 4 ? k % 2 ? 3 : 2 : 1 : 0), DIV = [8, 4, 2, 1];
-    seqs.forEach(it => { it.todo = new Set([...Array(it.q.n).keys()].filter(k => !it.q.blob[k])); });
+    const seqs = j.film.filter(it => it.q);
+    seqs.forEach(it => {
+      it.todo = [];
+      for (let k = 0; k < it.q.n; k++) {
+        if (!it.q.H.blob[k]) it.todo.push(['H', k]);
+        if (it.q.L && k % 2 === 0 && !it.q.L.blob[k]) it.todo.push(['L', k]);
+      }
+    });
     const pick = () => {
       const c = j.film[Math.max(0, j.cur)], here = c ? c.at + (j.local || 0) * c.w : 0;
+      const lLeft = seqs.some(it => it.todo.some(([T]) => T === 'L'));
+      const moving = performance.now() - lastScroll < 300; // skroll harakatda — avval kichik nusxa
       let best = null, bs = Infinity;
-      for (const it of seqs) for (const k of it.todo) {
-        const d = it.at + (k / (it.q.n - 1)) * it.w - here, sc = (d >= 0 ? d : -2 * d) / DIV[lvl(k)];
-        if (sc < bs) { bs = sc; best = [it, k]; }
+      for (const it of seqs) for (let i = 0; i < it.todo.length; i++) {
+        const [T, k] = it.todo[i];
+        if (T === 'L' && it.q.H.blob[k]) { it.todo.splice(i--, 1); continue; } // to'liq kadr bor — kichigi kerak emas
+        const d = it.at + (k / (it.q.n - 1)) * it.w - here, dist = d >= 0 ? d : -2 * d;
+        // kichik nusxa tugaguncha to'liq kadrlardan faqat skroll to'xtagan joy va undan keyingi bir nechtasi
+        let sc = T === 'L' ? dist * 0.1 : lLeft && (moving || !(d > -0.05 && d < 0.2)) ? 50 + dist : dist;
+        if (T === 'H' && it === c && k === it.q.want) sc = -1;
+        if (sc < bs) { bs = sc; best = [it, i]; }
       }
-      if (best) best[0].todo.delete(best[1]);
-      return best;
+      if (!best) return null;
+      const [it, i] = best, job = it.todo[i];
+      it.todo.splice(i, 1);
+      return [it, job[0], job[1]];
     };
-    let busy = 6;
+    let busy = 8;
     const worker = async () => {
       for (let p; J === j && (p = pick());) {
-        const [it, k] = p, b = await getBlob(frameUrl(it.q.name, it.q.v, k));
+        const [it, T, k] = p, b = await getBlob(tierUrl(it.q, T, k));
         if (J !== j) return;
-        if (b) { it.q.blob[k] = b; pumpDecode(); }
+        if (b) { it.q[T].blob[k] = b; pumpDecode(); }
       }
       if (--busy === 0 && J === j) j.film.forEach(wakeItem); // hamma kadr keldi — endi kiyim rasmlari
     };
-    for (let w = 0; w < 6; w++) worker();
+    for (let w = 0; w < 8; w++) worker();
   }
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const once = (el, ev) => new Promise(r => el.addEventListener(ev, r, { once: true }));
@@ -451,14 +481,14 @@
       const it = F[i];
       J.local = clamp((pos - it.at) / it.w);
       // kadrlar (telefon) darhol chiziladi — "seeked" kutilmaydi
-      if (it.q) drawFrame(it.q, clipTime(it, J.local), journeyScrub.t === journeyScrub.target);
+      if (it.q) drawFrame(it.q, clipTime(it, J.local));
       const moved = !!it.v && seekTo(it.v, clipTime(it, J.local));
       if (i !== J.cur) {
         J.cur = i; J.ready = !moved;
         if (moved) it.v.addEventListener('seeked', () => { if (J.cur === i) { J.ready = true; paintFilm(); } }, { once: true });
         [i - 1, i + 1].forEach(k => {
           const n = F[k], t = n && (k < i ? n.to : n.from);
-          if (n && n.q) drawFrame(n.q, t, true);
+          if (n && n.q) drawFrame(n.q, t);
           else if (n && n.v && n.v.duration) seekTo(n.v, t);
         });
       }
@@ -708,7 +738,7 @@
     render();
   }
 
-  let ticking = false;
+  let ticking = false, lastScroll = 0;
   function render() {
     ticking = false;
     // avval hamma o'lchamlar o'qiladi, keyin uslublar yoziladi — brauzer har kadrda sahifani qayta hisoblamaydi
@@ -721,7 +751,7 @@
     nav.classList.toggle('dark', !!overJourney);
     nav.classList.toggle('solid', !overJourney && y > innerHeight * 0.6);
   }
-  addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
+  addEventListener('scroll', () => { lastScroll = performance.now(); if (!ticking) { ticking = true; requestAnimationFrame(render); } }, { passive: true });
   addEventListener('resize', () => { sizeJourney(); render(); });
   addEventListener('load', () => { measure(); render(); });
 
